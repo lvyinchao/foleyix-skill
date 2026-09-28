@@ -1,0 +1,8 @@
+node_modules/
+public/downloads/
+dist/
+credentials/
+output/
+.env*
+*.log
+.DS_Store

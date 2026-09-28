@@ -1,0 +1,15 @@
+{
+  "name": "foleyix-agent-skill",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT-0",
+  "engines": {
+    "node": ">=22.20.0"
+  },
+  "scripts": {
+    "test": "node --test tests/foleyix-cli.test.mjs",
+    "check": "node --check skills/foleyix/scripts/foleyix.mjs",
+    "package": "node scripts/package-foleyix-skill.mjs"
+  }
+}
