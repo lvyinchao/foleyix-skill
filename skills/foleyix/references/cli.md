@@ -4,7 +4,7 @@ The entrypoint is `node scripts/foleyix.mjs COMMAND`, resolved against the insta
 
 ## Login and storage
 
-`login` creates a ten-minute device authorization and waits for website approval. The short user code and authorization URL appear only on stderr, so `--json` stdout remains parseable. `--no-browser` works on remote terminals. `--timeout SECONDS` can shorten the wait. Rejected or expired approval returns an explicit error.
+`login` creates a ten-minute device authorization and waits for website approval. The short user code and authorization URL appear only on stderr, so `--json` stdout remains parseable. Login never launches the browser or another system program: the user opens the displayed authorization URL manually. `--no-browser` remains accepted for compatibility, including on remote terminals. `--timeout SECONDS` can shorten the wait. Rejected or expired approval returns an explicit error.
 
 The default private root is `~/.config/foleyix`; `FOLEYIX_CONFIG_DIR` can choose another private directory for an isolated profile. Each service origin gets its own hashed subdirectory, login, lock, and request journal. Directories use mode 700 and files 600 on Unix. Symlink credentials and configuration directories are refused. Do not read or copy these files into an agent context or project.
 

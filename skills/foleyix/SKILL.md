@@ -4,7 +4,7 @@ description: Generate narration, dialogue, sound scenes, sound effects, and ambi
 license: MIT-0
 metadata:
   author: "Foleyix"
-  version: "1.0.0"
+  version: "1.0.1"
   homepage: "https://foleyix.com/skill"
   openclaw:
     requires:
@@ -36,7 +36,7 @@ If `whoami` requests login, run:
 node scripts/foleyix.mjs login --no-browser --json
 ```
 
-The CLI writes an authorization URL and short user code to stderr. Present them to the user and wait for the user to log in, verify the account and code, and approve on the website. Do not collect the user's password, approve on their behalf, read the private credential file, or put credentials in agent context. Successful login returns the connected account without tokens. `login` without `--no-browser` also tries to open the browser.
+The CLI writes an authorization URL and short user code to stderr. Present them to the user and wait for the user to log in, verify the account and code, and approve on the website. Do not collect the user's password, approve on their behalf, read the private credential file, or put credentials in agent context. Successful login returns the connected account without tokens. Login always displays the link for the user to open manually; it does not launch system programs. `--no-browser` remains accepted for compatibility.
 
 ## Create and deliver audio
 

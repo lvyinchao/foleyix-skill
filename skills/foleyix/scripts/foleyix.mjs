@@ -1,13 +1,12 @@
 #!/usr/bin/env node
-/** Foleyix 1.0.0 — zero-dependency CLI; Node.js 22.20 or newer. */
+/** Foleyix 1.0.1 — zero-dependency CLI; Node.js 22.20 or newer. */
 import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 const CLIENT_ID = 'foleyix-cli';
 const DEFAULT_ORIGIN = 'https://foleyix.com';
 const MODES = ['narration', 'dialogue', 'scene', 'sfx', 'ambience'];
@@ -284,13 +283,6 @@ async function login(options) {
   verification.searchParams.set('user_code', device.user_code);
   const authorizationUrl = verification.href;
   note('Open ' + authorizationUrl + '\nAuthorization code: ' + device.user_code + '\nLog in on the website, check the account and code, and approve this CLI.');
-  if (!options['no-browser']) {
-    const program = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'rundll32' : 'xdg-open';
-    const args = process.platform === 'win32' ? ['url.dll,FileProtocolHandler', authorizationUrl] : [authorizationUrl];
-    const child = spawn(program, args, { stdio: 'ignore', detached: true, shell: false });
-    child.on('error', () => note('Open the authorization URL manually in your browser.'));
-    child.unref();
-  }
   const until = Date.now() + Math.min(device.expires_in, integerOption(options.timeout, device.expires_in, 600)) * 1000;
   let interval = Number.isFinite(device.interval) ? Math.max(1, device.interval) : 5;
   for (;;) {
@@ -489,7 +481,7 @@ async function downloadJob(job, options) {
 const HELP = [
   'Foleyix ' + VERSION + ' — Node.js 22.20+',
   'Usage: node scripts/foleyix.mjs <command> [options]',
-  'login [--no-browser] [--timeout seconds]  Approve this CLI on the website',
+  'login [--no-browser] [--timeout seconds]  Open the displayed website URL manually and approve',
   'whoami                                  Show the connected account',
   'logout                                  Revoke this CLI connection',
   'quota                                   Show shared audio-time quota and queue',
@@ -499,6 +491,7 @@ const HELP = [
   'status <jobId>',
   'download <jobId> [--out audio.wav] [--force]',
   'Global: --json, --origin https://foleyix.com',
+  'Login always displays the authorization URL; --no-browser is retained for compatibility.',
   'Generation waits up to 600 seconds by default. A timeout retains the task and request IDs.',
   'Credentials stay in a private, per-origin directory; do not copy them into a project.',
 ].join('\n');

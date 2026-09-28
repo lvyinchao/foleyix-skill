@@ -32,7 +32,7 @@ node scripts/foleyix.mjs whoami
 node scripts/foleyix.mjs quota
 ```
 
-Login opens Foleyix in your browser. Sign in, match the displayed account and code with your terminal, then approve the connection. The agent must wait for your approval. For a remote terminal, use `login --no-browser`.
+Login prints a Foleyix authorization URL and short code. Open that URL manually in your browser, sign in, match the displayed account and code with your terminal, then approve the connection. The agent must wait for your approval. The CLI never launches a browser or another system program; `login --no-browser` remains accepted for compatibility.
 
 The CLI authorization can generate audio, read your allowance and jobs, and download your private audio. It cannot manage projects, voices, account settings, payments or the operations dashboard. Credentials stay outside the skill and project files. Use `logout` to revoke this CLI connection while retaining your website session.
 
