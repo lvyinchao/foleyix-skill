@@ -14,7 +14,7 @@ All commands accept `--origin https://foleyix.com`. A custom deployment must use
 
 ## Generation and request recovery
 
-`generate` requires exactly one of `--prompt TEXT` and `--input UTF8_FILE`. Five modes are available: `narration`, `dialogue`, `scene`, `sfx`, `ambience`. The service enforces current text limits and account entitlement. Generation spends audio time in seconds, with queue and quota reservations shared with the website.
+`generate` requires exactly one of `--prompt TEXT` and `--input UTF8_FILE`. Seven modes are available: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. The default remains `narration`; explicitly choose `free` for complete authored scenes. Modes label the task and do not change its prompt. The CLI rejects input above 3,000 Unicode code points before requesting login or saving a request; UTF-8 files also have a 64 KiB byte limit. The service enforces current account entitlement. Generation spends audio time in seconds, with queue and quota reservations shared with the website.
 
 The CLI writes a request ID and input hash before contacting the service; prompt content is not stored in its journal. Network retries use the same `Idempotency-Key`. Concurrent matching unresolved requests use the same ID. To resume a known request explicitly:
 
@@ -41,3 +41,9 @@ Generation waits 600 seconds by default; `--timeout SECONDS` allows 1–3600 sec
 - Failure: `{ "ok": false, "error": { "code": "...", "message": "..." } }` with exit code 1. A generation error includes the saved request ID, and a terminal task error includes its task ID.
 
 Use `error.code`, not English message text, for recovery. `not_logged_in`/`login_required` require website login; `queue_full` requires waiting; insufficient quota requires account action; `result_unavailable` may indicate expiration; `generation_unknown` requires checking the existing task. Credentials are intentionally absent from every JSON response.
+
+## Quota and website features
+
+`quota` returns generation seconds (`generationLimit`, `generationUsed`, `generationReserved`), storage bytes (`storageLimit`, `storageUsed`), queue slots (`queueLimit`, `queueUsed`) and any export allowance. Available generation time is `generationLimit - generationUsed - generationReserved`; available storage is `storageLimit - storageUsed`. A queued or running task can hold seconds until it settles or fails. Export fields describe account quota; they do not expose an export command.
+
+The CLI authorizes only generation from mode and prompt plus account/task/audio reads. Reference selection and upload, @ voice binding, rate/volume controls, prompt optimization, free script creation, professional project assembly and episode export use the website. Read [prompt-writing.md](prompt-writing.md) for scene structure and public examples.

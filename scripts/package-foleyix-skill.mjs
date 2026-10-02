@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = path.join(repository, 'skills', 'foleyix');
-const files = ['LICENSE', 'SKILL.md', 'agents/openai.yaml', 'references/cli.md', 'scripts/foleyix.mjs'];
+const files = ['LICENSE', 'SKILL.md', 'agents/openai.yaml', 'references/cli.md', 'references/prompt-writing.md', 'scripts/foleyix.mjs'];
 const args = process.argv.slice(2);
 let output = path.join(repository, 'public', 'downloads'), publicReleased = false, qoder = false;
 for (let i = 0; i < args.length; i++) {

@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-/** Foleyix 1.0.1 — zero-dependency CLI; Node.js 22.20 or newer. */
+/** Foleyix 1.1.0 — zero-dependency CLI; Node.js 22.20 or newer. */
 import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 
-const VERSION = '1.0.1';
+const VERSION = '1.1.0';
 const CLIENT_ID = 'foleyix-cli';
 const DEFAULT_ORIGIN = 'https://foleyix.com';
-const MODES = ['narration', 'dialogue', 'scene', 'sfx', 'ambience'];
+const MODES = ['free', 'narration', 'dialogue', 'podcast', 'scene', 'sfx', 'ambience'];
 const STATES = ['queued', 'running', 'succeeded', 'failed', 'unknown'];
 const WAV_MIMES = ['audio/wav', 'audio/wave', 'audio/x-wav', 'audio/vnd.wave'];
 const MAX_AUDIO_BYTES = 128 * 1024 * 1024;
@@ -355,7 +355,7 @@ async function waitForJob(job, timeout) {
 async function generate(options) {
   if ((options.prompt === undefined) === (options.input === undefined)) fail('invalid_argument', 'Provide exactly one of --prompt or --input.');
   const mode = options.mode || 'narration';
-  if (!MODES.includes(mode)) fail('invalid_argument', 'Use narration, dialogue, scene, sfx, or ambience.');
+  if (!MODES.includes(mode)) fail('invalid_argument', 'Use ' + MODES.join(', ') + '.');
   if (options['no-wait'] && options.out) fail('invalid_argument', '--out requires waiting for the task; remove --no-wait.');
   if (options.force && !options.out) fail('invalid_argument', '--force requires --out.');
   const timeout = integerOption(options.timeout, 600, 3600);
@@ -368,6 +368,7 @@ async function generate(options) {
   }
   if (typeof prompt !== 'string' || !prompt.trim() || Buffer.byteLength(prompt, 'utf8') > 64 * 1024) fail('invalid_input', 'Provide nonempty text no larger than 64 KiB; the service also enforces mode limits.');
   prompt = prompt.trim();
+  if (Array.from(prompt).length > 3000) fail('invalid_input', 'Use no more than 3,000 Unicode characters.');
   // Check login before creating an unresolved journal entry.
   await accessToken();
   const record = await requestRecord(prompt, mode, options['request-id']);
@@ -485,7 +486,7 @@ const HELP = [
   'whoami                                  Show the connected account',
   'logout                                  Revoke this CLI connection',
   'quota                                   Show shared audio-time quota and queue',
-  'generate --prompt text | --input file [--mode narration|dialogue|scene|sfx|ambience]',
+  'generate --prompt text | --input file [--mode free|narration|dialogue|podcast|scene|sfx|ambience]',
   '         [--out audio.wav] [--force] [--no-wait] [--request-id id] [--timeout seconds]',
   'jobs [--active] [--cursor cursor] [--limit 1..100]',
   'status <jobId>',
@@ -493,6 +494,7 @@ const HELP = [
   'Global: --json, --origin https://foleyix.com',
   'Login always displays the authorization URL; --no-browser is retained for compatibility.',
   'Generation waits up to 600 seconds by default. A timeout retains the task and request IDs.',
+  'Input: up to 3,000 Unicode characters. Default mode: narration; modes do not rewrite the prompt.',
   'Credentials stay in a private, per-origin directory; do not copy them into a project.',
 ].join('\n');
 async function main() {
@@ -512,7 +514,7 @@ async function main() {
   if (command === 'quota') {
     const value = (await authenticated('/api/quota')).quota;
     if (!value || typeof value !== 'object') fail('invalid_response', 'The quota response is incomplete.');
-    const quota = Object.fromEntries(['plan', 'generationUnit', 'generationLimit', 'generationUsed', 'generationReserved', 'exportLimit', 'exportUsed', 'exportReserved', 'projectLimit', 'storageLimit', 'queueLimit', 'queueUsed', 'periodEnd'].filter((key) => typeof value[key] === 'string' || Number.isFinite(value[key]) || value[key] === null).map((key) => [key, value[key]]));
+    const quota = Object.fromEntries(['plan', 'generationUnit', 'generationLimit', 'generationUsed', 'generationReserved', 'exportLimit', 'exportUsed', 'exportReserved', 'projectLimit', 'storageLimit', 'storageUsed', 'queueLimit', 'queueUsed', 'periodEnd'].filter((key) => typeof value[key] === 'string' || Number.isFinite(value[key]) || value[key] === null).map((key) => [key, value[key]]));
     return output({ ok: true, quota });
   }
   if (command === 'jobs') {

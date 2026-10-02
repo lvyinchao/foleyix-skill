@@ -1,10 +1,10 @@
 ---
 name: foleyix
-description: Generate narration, dialogue, sound scenes, sound effects, and ambience with Foleyix; check audio tasks and account quota, then download private WAV results. Use when the user asks for Foleyix audio creation or wants these audio files produced through their Foleyix account.
+description: Create audio from free-form descriptions, narration, dialogue, podcasts, sound scenes, sound effects, and ambience with Foleyix; check tasks and quota, then download private WAV results. Use when the user asks to create or retrieve audio through their Foleyix account.
 license: MIT-0
 metadata:
   author: "Foleyix"
-  version: "1.0.1"
+  version: "1.1.0"
   homepage: "https://foleyix.com/skill"
   openclaw:
     requires:
@@ -44,20 +44,26 @@ Choose the mode that fits the requested result:
 
 | Mode | Input |
 | --- | --- |
+| `free` | A complete authored sound description |
 | `narration` | Spoken text and brief delivery instructions |
 | `dialogue` | Speaker-labelled dialogue and character descriptions |
+| `podcast` | Host-labelled conversation with natural turn taking |
 | `scene` | A sound scene combining speech, events, and atmosphere |
 | `sfx` | A specific sound event and its timing or texture |
 | `ambience` | A sustained background sound environment |
 
-Use only synthetic character voices for this workflow. Voice-reference upload, voice cloning, project editing, and whole-episode exports are outside this skill's commands.
+For structured scenes, read [references/prompt-writing.md](references/prompt-writing.md): it explains characters, quoted dialogue, effects, music, listening order, and the current public examples. Preserve the user's words and chosen language. Templates and optimization are suggestions; use the final authored prompt rather than silently replacing it.
+
+Use synthetic character descriptions in CLI prompts. The website's reference-audio selection with `@voice1`–`@voice3`, reference upload, audio controls, prompt optimizer, free script generator, project editing, and whole-episode exports require website workflows; this CLI accepts only mode and prompt and cannot bind reference audio. Do not imply that typing an @ marker into a CLI prompt attaches a voice.
 
 ```sh
 node scripts/foleyix.mjs quota --json
 node scripts/foleyix.mjs generate --mode narration --prompt "Welcome aboard. Read warmly and clearly." --out ./welcome.wav --json
 ```
 
-Use `--input /absolute/path/script.txt` instead of `--prompt` for UTF-8 files. The default mode is `narration`. Generation waits up to ten minutes and downloads when `--out` is supplied; `--no-wait` returns the task ID immediately. Check the result's status and absolute file path before calling it complete. If audio inspection or playback is available in the host, listen to the delivered file and compare it with the user's request.
+Use `--input /absolute/path/script.txt` instead of `--prompt` for UTF-8 files. Input is limited to 3,000 Unicode characters. Mode selection labels the task; it does not rewrite or add instructions to the submitted prompt. The default remains `narration` for existing commands; explicitly choose `--mode free` for complete descriptions and copied inspiration prompts. Generation waits up to ten minutes and downloads when `--out` is supplied; `--no-wait` returns the task ID immediately. Check the result's status and absolute file path before calling it complete. If audio inspection or playback is available in the host, listen to the delivered file and compare it with the user's request.
+
+Check quota before generating: available generation seconds are `generationLimit - generationUsed - generationReserved`. Queued tasks hold reservations; a wait timeout does not release them. Storage and queue capacity are shared with the website. Requested duration is guidance, not a guarantee; report the actual delivered duration when available. Downloading an existing result does not consume generation seconds.
 
 Every generation request has a persistent request ID. If a response is lost, the CLI retries with the same ID and reuses unresolved matching requests on the next invocation. Preserve the returned `requestId` and use `--request-id ID` with exactly the same input when resuming. Never automatically create a replacement for a task whose status is `unknown`. A wait timeout leaves the task running; use its existing ID:
 

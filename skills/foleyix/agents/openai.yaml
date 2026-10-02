@@ -1,6 +1,6 @@
 interface:
   display_name: "Foleyix"
   short_description: "Create and download audio with your Foleyix account"
-  default_prompt: "Use $foleyix to generate the requested audio and deliver a WAV file."
+  default_prompt: "Use $foleyix to prepare the requested sound description, check my quota, generate audio in the appropriate mode, and deliver the finished WAV file."
 policy:
   allow_implicit_invocation: true

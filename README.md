@@ -1,6 +1,6 @@
 # Foleyix Agent Skill
 
-Create narration, dialogue, sound scenes, sound effects and ambience through your Foleyix account, then download the finished WAV. This repository contains the portable Agent Skills package and its dependency-free Node CLI.
+Create free-form sound scenes, narration, dialogue, podcasts, sound effects and ambience through your Foleyix account, then download the finished WAV. This repository contains the portable Agent Skills package and its dependency-free Node CLI.
 
 Supported installation targets include Codex, Claude Code, Qoder, OpenClaw and Hermes. Node **22.20 or later** is required. The skill and CLI are MIT-0; audio generation uses your Foleyix account and the same duration allowance as the website. Downloading existing audio does not consume generation time.
 
@@ -44,9 +44,11 @@ node scripts/foleyix.mjs generate --mode narration \
   --out ./narration.wav
 ```
 
-Modes: `narration`, `dialogue`, `scene`, `sfx`, `ambience`. Use `--input script.txt` for a UTF-8 text file. The CLI waits for the job and validates the WAV before saving it. `--json` provides structured results without exposing access or refresh credentials.
+Modes: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. The default remains `narration`; modes label tasks without rewriting prompts. Prompts are limited to 3,000 Unicode characters. Use `--input script.txt` for a UTF-8 text file. The CLI waits for the job and validates the WAV before saving it. `--json` provides structured results without exposing access or refresh credentials.
 
 Keep the job ID if generation times out or its result is unknown. Follow that job with `status`, then use `download`; do not automatically create another generation to retry the same request. Use the same `--request-id` when resuming a request whose initial response was lost.
+
+For characters, dialogue, music, effects and current inspiration examples, read the [prompt writing guide](skills/foleyix/references/prompt-writing.md). Reference uploads, @ voice binding, prompt optimization and professional exports use the website.
 
 See [CLI reference](skills/foleyix/references/cli.md) and [SKILL.md](skills/foleyix/SKILL.md) for the complete workflow.
 
