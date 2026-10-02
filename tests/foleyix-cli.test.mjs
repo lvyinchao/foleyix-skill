@@ -228,7 +228,7 @@ test('release ZIP is deterministic, has only reviewed skill files, and checksum 
   const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'first', 'foleyix-skill-manifest.json'), 'utf8')); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length); assert.equal(manifest.version, '1.1.0'); assert.equal(manifest.publicReleased, false);
   const names = []; let offset = 0;
   while (bytes.readUInt32LE(offset) === 0x04034b50) { const size = bytes.readUInt32LE(offset + 18), nameLength = bytes.readUInt16LE(offset + 26), extraLength = bytes.readUInt16LE(offset + 28); names.push(bytes.toString('utf8', offset + 30, offset + 30 + nameLength)); offset += 30 + nameLength + extraLength + size; }
-  assert.deepEqual(names.sort(), ['foleyix/LICENSE', 'foleyix/SKILL.md', 'foleyix/agents/openai.yaml', 'foleyix/references/cli.md', 'foleyix/scripts/foleyix.mjs']);
+  assert.deepEqual(names.sort(), ['foleyix/LICENSE', 'foleyix/SKILL.md', 'foleyix/agents/openai.yaml', 'foleyix/references/cli.md', 'foleyix/references/prompt-writing.md', 'foleyix/scripts/foleyix.mjs']);
 });
 test('Qoder flat ZIP contains root SKILL.md, preserves audited bytes, and leaves canonical output unchanged', async (t) => {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'foleyix-qoder-package-')); t.after(() => fs.rm(temporary, { recursive: true, force: true }));
@@ -247,7 +247,7 @@ test('Qoder flat ZIP contains root SKILL.md, preserves audited bytes, and leaves
     assert.deepEqual(bytes.subarray(bodyOffset, bodyOffset + size), await fs.readFile(path.join(repository, 'skills/foleyix', name)));
     offset = bodyOffset + size;
   }
-  assert.deepEqual(entries.sort(), ['LICENSE', 'SKILL.md', 'agents/openai.yaml', 'references/cli.md', 'scripts/foleyix.mjs']);
+  assert.deepEqual(entries.sort(), ['LICENSE', 'SKILL.md', 'agents/openai.yaml', 'references/cli.md', 'references/prompt-writing.md', 'scripts/foleyix.mjs']);
   const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'foleyix-qoder-manifest.json'), 'utf8'));
   assert.equal(manifest.zip, '/downloads/foleyix-qoder.zip'); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length);
   assert.equal(await fs.readFile(path.join(temporary, 'foleyix-qoder.sha256'), 'utf8'), manifest.sha256 + '  foleyix-qoder.zip\n');
