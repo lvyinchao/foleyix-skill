@@ -43,7 +43,7 @@ async function fixture(t, { handler } = {}) {
   const server = http.createServer(async (request, response) => {
     const bodyParts = [];
     for await (const chunk of request) bodyParts.push(chunk);
-    const raw = Buffer.concat(bodyParts).toString('utf8'), body = raw ? JSON.parse(raw) : null;
+    const raw = Buffer.concat(bodyParts), body = request.headers['content-type'] === 'audio/wav' ? raw : raw.length ? JSON.parse(raw.toString('utf8')) : null;
     requests.push({ method: request.method, url: request.url, headers: request.headers, body });
     const send = (status, value) => { response.writeHead(status, { 'Content-Type': 'application/json' }); response.end(JSON.stringify(value)); };
     if (handler && await handler({ request, response, body, send, state, job, jobs, origin })) return;
@@ -98,7 +98,7 @@ async function fixture(t, { handler } = {}) {
 test('device login waits for human approval, saves private per-origin login, and never outputs secrets', async (t) => {
   const f = await fixture(t, { handler({ request, body, send, state }) { if (request.url === '/api/cli/auth/token' && body.grant_type !== 'refresh_token' && state.polls++ === 0) { send(400, { error: 'authorization_pending' }); return true; } } });
   const result = await f.run(['login']);
-  assert.equal((await f.run(['version'])).data.version, '1.4.1');
+  assert.equal((await f.run(['version'])).data.version, '1.5.0');
   assert.equal(result.code, 0); assert.equal(result.data.user.email, 'user@example.test'); assert.equal(result.data.modelEnabled, true);
   assert.match(result.stderr, /ABCD-EFGH/); assert.match(result.stderr, /\/activate\?user_code=ABCD-EFGH/);
   const saved = JSON.parse(await fs.readFile(f.credentialPath, 'utf8'));
@@ -291,7 +291,7 @@ test('release ZIP is deterministic, has only reviewed skill files, and checksum 
   const script = path.join(repository, 'scripts/package-foleyix-skill.mjs');
   const first = await child(process.execPath, [script, '--out-dir', path.join(temporary, 'first')]); const second = await child(process.execPath, [script, '--out-dir', path.join(temporary, 'second')]); assert.equal(first.code, 0); assert.equal(second.code, 0);
   const bytes = await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill.zip')); assert.deepEqual(bytes, await fs.readFile(path.join(temporary, 'second', 'audiocreator-foleyix-skill.zip')));
-  const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill-manifest.json'), 'utf8')); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length); assert.equal(manifest.version, '1.4.1'); assert.equal(manifest.publicReleased, false); assert.equal(manifest.name, 'audiocreator-foleyix');
+  const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill-manifest.json'), 'utf8')); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length); assert.equal(manifest.version, '1.5.0'); assert.equal(manifest.publicReleased, false); assert.equal(manifest.name, 'audiocreator-foleyix');
   const names = []; let offset = 0;
   while (bytes.readUInt32LE(offset) === 0x04034b50) { const size = bytes.readUInt32LE(offset + 18), nameLength = bytes.readUInt16LE(offset + 26), extraLength = bytes.readUInt16LE(offset + 28); names.push(bytes.toString('utf8', offset + 30, offset + 30 + nameLength)); offset += 30 + nameLength + extraLength + size; }
   assert.deepEqual(names.sort(), ['audiocreator-foleyix/LICENSE', 'audiocreator-foleyix/SKILL.md', 'audiocreator-foleyix/agents/openai.yaml', 'audiocreator-foleyix/references/audio-capabilities.json', 'audiocreator-foleyix/references/capabilities.md', 'audiocreator-foleyix/references/cli.md', 'audiocreator-foleyix/references/examples.md', 'audiocreator-foleyix/references/prompt-writing.md', 'audiocreator-foleyix/references/sound-design.md', 'audiocreator-foleyix/references/speech.md', 'audiocreator-foleyix/scripts/foleyix.mjs']);
@@ -318,4 +318,34 @@ test('Qoder flat ZIP contains root SKILL.md, preserves audited bytes, and leaves
   assert.equal(manifest.zip, '/downloads/audiocreator-foleyix-qoder.zip'); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length);
   assert.equal(await fs.readFile(path.join(temporary, 'audiocreator-foleyix-qoder.sha256'), 'utf8'), manifest.sha256 + '  audiocreator-foleyix-qoder.zip\n');
   const repeated = await child(process.execPath, [script, '--qoder', '--out-dir', temporary]); assert.equal(repeated.code, 0); assert.deepEqual(await fs.readFile(flatPath), bytes);
+});
+
+test('voice-create saves a draft and voice-preview uses recoverable idempotent jobs and downloads real WAV', async t=>{
+ let creates=0,previews=0;const ids=[];
+ const f=await fixture(t,{handler({request,body,send,job}){
+  if(request.url==='/api/voices'&&request.method==='POST'){creates++;assert.deepEqual(body,{name:'Narrator',description:'Warm synthetic adult voice',previewText:'Hello.'});send(201,{voice:{id:'voice-owned',name:body.name,description:body.description,status:'draft',source:'design'}});return true;}
+  if(request.url==='/api/generations/voice'){previews++;assert.deepEqual(body,{voiceId:'voice-owned'});ids.push(request.headers['idempotency-key']);if(previews===1)send(503,{code:'service_not_ready'});else send(202,{job:job('voice-preview-1',{kind:'voice-design'})});return true;}
+ }});await f.seed();
+ const draft=await f.run(['voice-create','--name','Narrator','--description','Warm synthetic adult voice','--preview-text','Hello.']);assert.equal(draft.code,0);assert.equal(draft.data.voice.status,'draft');assert.equal(creates,1);
+ const out=path.join(f.directory,'preview.wav');const preview=await f.run(['voice-preview','voice-owned','--request-id','preview-once','--out',out]);assert.equal(preview.code,0);assert.equal(preview.data.job.kind,'voice-design');assert.deepEqual(ids,['preview-once','preview-once']);assert.deepEqual(await fs.readFile(out),audio);
+ const again=await f.run(['voice-preview','voice-owned','--request-id','preview-once']);assert.equal(again.code,0);assert.equal(previews,2);
+ const changed=await f.run(['voice-preview','different-voice','--request-id','preview-once']);assert.equal(changed.code,1);assert.equal(previews,2);
+});
+
+test('voice-upload sends exact WAV, encoded name and explicit rights, rejecting invalid audio before network', async t=>{
+ const f=await fixture(t,{handler({request,body,send}){
+  if(request.url==='/api/voices/upload'){assert.deepEqual(body,audio);assert.equal(request.headers['x-audio-rights'],'confirmed');assert.equal(decodeURIComponent(request.headers['x-audio-name']),'测试参考');assert.equal(request.headers.authorization,'Bearer '+oldAccess);send(201,{voice:{id:'voice-uploaded',name:'测试参考',description:'Reference audio',status:'done',source:'upload',assetId:'uploaded-asset',referenceAudio:{duration:0.01,bytes:audio.length}}});return true;}
+ }});await f.seed();const input=path.join(f.directory,'reference.wav');await fs.writeFile(input,audio);
+ const missing=await f.run(['voice-upload','--name','测试参考','--input',input]);assert.equal(missing.data.error.code,'reference_rights_required');assert.equal(f.requests.length,0);
+ const invalid=path.join(f.directory,'invalid.wav');await fs.writeFile(invalid,Buffer.alloc(100));assert.equal((await f.run(['voice-upload','--name','Invalid','--input',invalid,'--rights-confirmed'])).data.error.code,'invalid_reference_audio');assert.equal(f.requests.length,0);
+ const long=path.join(f.directory,'long.wav'),bytes=Buffer.alloc(44+31*32000);audio.copy(bytes,0,0,44);bytes.writeUInt32LE(bytes.length-8,4);bytes.writeUInt32LE(bytes.length-44,40);await fs.writeFile(long,bytes);assert.equal((await f.run(['voice-upload','--name','Long','--input',long,'--rights-confirmed'])).data.error.code,'reference_audio_too_long');assert.equal(f.requests.length,0);
+ const large=path.join(f.directory,'large.wav');await fs.writeFile(large,Buffer.alloc(10000001));assert.equal((await f.run(['voice-upload','--name','Large','--input',large,'--rights-confirmed'])).data.error.code,'reference_audio_too_large');assert.equal(f.requests.length,0);
+ const result=await f.run(['voice-upload','--name','测试参考','--input',input,'--rights-confirmed']);assert.equal(result.code,0);assert.equal(result.data.voice.id,'voice-uploaded');assert.equal(result.data.voice.status,'done');assert.equal(f.requests.length,1);
+});
+
+test('legacy scope denial explains re-login; uncertain metadata writes are not retried', async t=>{
+ let creates=0;const f=await fixture(t,{handler({request,send}){if(request.url==='/api/voices'&&request.method==='POST'){creates++;send(creates===1?403:500,{code:creates===1?'cli_scope_denied':'service_not_ready'});return true;}}});await f.seed();
+ const args=['voice-create','--name','Narrator','--description','Synthetic adult voice'];const denied=await f.run(args);assert.equal(denied.data.error.code,'cli_scope_denied');assert.match(denied.data.error.message,/login again/);
+ const uncertain=await f.run(args);assert.equal(uncertain.code,1);assert.equal(creates,2);
+ const login=await f.run(['login']);assert.equal(login.code,0);assert.equal(f.requests.find(r=>r.url==='/api/cli/auth/device-code').body.scope,'audio:read audio:generate voices:write');
 });

@@ -36,9 +36,6 @@ async function validateTree(directory, relative = '') {
     else if (!stat.isFile() || !files.includes(entry)) throw new Error('Unexpected skill file; review before packaging: ' + entry);
   }
 }
-// Website synchronization is validated in the upstream Foleyix project before export.
-const capabilities = JSON.parse(await fs.readFile(path.join(source, 'references/audio-capabilities.json'), 'utf8'));
-if (capabilities.schemaVersion !== 1 || !Array.isArray(capabilities.types)) throw new Error('Invalid bundled audio capability snapshot.');
 await validateTree(source);
 const markdown = await fs.readFile(path.join(source, 'SKILL.md'), 'utf8');
 const version = markdown.match(/^  version: "(\d+\.\d+\.\d+)"$/m)?.[1];

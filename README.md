@@ -32,7 +32,7 @@ Background music is instrumental; songs include singing or rap and exact lyrics.
 node scripts/foleyix.mjs capabilities --json
 ```
 
-This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. CLI 1.4.1 can list and bind your saved reference voices. Reference creation/import/upload, game batches and programme editing/export use the website.
+This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. CLI 1.5.0 can create synthetic references, generate previews, upload authorized WAVs, and list and bind saved references. Catalog import, game batches and programme editing/export use the website.
 
 ## Connect your account
 
@@ -46,7 +46,7 @@ node scripts/foleyix.mjs quota
 
 Login prints a Foleyix authorization URL and short code. Open that URL manually in your browser, sign in, match the displayed account and code with your terminal, then approve the connection. The agent must wait for your approval. The CLI never launches a browser or another system program; `login --no-browser` remains accepted for compatibility.
 
-The CLI authorization can generate audio, read your allowance, jobs and saved reference voices, and download your private audio. It cannot create/edit/delete voices, manage projects, account settings, payments or the operations dashboard. Credentials stay outside the skill and project files. Use `logout` to revoke this CLI connection while retaining your website session.
+New login requests `audio:read audio:generate voices:write`: generation, owned reference creation/preview/upload, allowance and task reads, and private audio downloads. Older connections retain their original grants; run `login` again and approve the displayed reference write permission before using the new commands. Editing/deleting voices, catalog import, projects, account settings, payments and the operations dashboard remain excluded. Credentials stay outside the skill and project files. Use `logout` to revoke this CLI connection while retaining your website session.
 
 ## Create audio
 
@@ -60,11 +60,21 @@ Modes: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. T
 
 Keep the job ID if generation times out or its result is unknown. Follow that job with `status`, then use `download`; do not automatically create another generation to retry the same request. Use the same `--request-id` when resuming a request whose initial response was lost.
 
-For characters, dialogue, music, effects and current inspiration examples, read the [prompt writing guide](skills/audiocreator-foleyix/references/prompt-writing.md). Reference uploads, prompt optimization and professional exports use the website. To attach saved references, use the ordered CLI options below.
+For characters, dialogue, music, effects and current inspiration examples, read the [prompt writing guide](skills/audiocreator-foleyix/references/prompt-writing.md). Reference uploads can use the CLI with explicit rights confirmation. Prompt optimization and professional exports use the website. To attach saved references, use the ordered CLI options below.
 
 See [CLI reference](skills/audiocreator-foleyix/references/cli.md) and [SKILL.md](skills/audiocreator-foleyix/SKILL.md) for the complete workflow.
 
-## Bind reference audio (1.4.1)
+## Create and upload reference audio (1.5.0)
+
+```sh
+node scripts/foleyix.mjs voice-create --name "Narrator" --description "Warm, clear synthetic adult voice" --preview-text "Welcome aboard." --json
+node scripts/foleyix.mjs voice-preview RETURNED_VOICE_ID --out ./reference.wav --json
+node scripts/foleyix.mjs voice-upload --input /absolute/path/reference.wav --name "Narrator reference" --rights-confirmed --json
+```
+
+Creation first saves metadata; a successful preview produces a reusable reference and uses the shared generation allowance. Upload accepts a complete PCM/float WAV up to 30 seconds and 10 MB, requires rights and speaker permission, and uses storage without generation seconds. `voice-preview` supports the same request recovery and download options as `generate`; `jobs --kind voice-design` follows previews. Inspect `voices` before retrying an uncertain metadata creation or upload, since those writes are not idempotent.
+
+## Bind reference audio
 
 ```sh
 node scripts/foleyix.mjs voices --json

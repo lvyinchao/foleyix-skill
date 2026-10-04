@@ -19,10 +19,10 @@
     { "id": "game-sound-effects", "name": "Game sound effects", "nameZh": "游戏音效", "websitePath": "/game-sound-effects-generator", "standalone": true, "websiteMode": "free", "cliMode": "sfx", "guide": "sound-design.md", "input": "Game action and sound progression. Single clips through CLI; batch, variants and selected ZIP through the website." },
     { "id": "narration", "name": "Narration", "nameZh": "旁白与朗读", "websitePath": "/app", "standalone": false, "websiteMode": "free", "cliMode": "narration", "guide": "speech.md", "input": "Exact narration text and necessary delivery directions." },
     { "id": "sound-scene", "name": "Sound scene", "nameZh": "广告、广播剧与声音场景", "websitePath": "/app", "standalone": false, "websiteMode": "free", "cliMode": "scene", "guide": "prompt-writing.md", "input": "Exact speech and requested effects, ambience or music in listening order." },
-    { "id": "character-voice", "name": "Character voice design", "nameZh": "角色音色设计", "websitePath": "/voice-library", "standalone": false, "websiteMode": null, "cliMode": null, "guide": "speech.md", "input": "Voice description and short preview text; saved reusable reference creation/import requires the website." }
+    { "id": "character-voice", "name": "Character voice design", "nameZh": "角色音色设计", "websitePath": "/voice-library", "standalone": false, "websiteMode": null, "cliMode": null, "cliCommands": ["voice-create", "voice-preview"], "guide": "speech.md", "input": "Voice description and short preview text; create and preview reusable references with the CLI. Catalog import uses the website." }
   ],
   "features": {
-    "cli": ["prompt-writing", "audio-generation", "reference-voice-list", "reference-selection", "quota", "task-history-and-status", "private-wav-download"],
-    "websiteOnly": ["reference-upload", "saved-character-voice-preview-and-import", "audio-rate-and-volume-controls", "script-generator", "audio-to-text", "media-to-sound-script", "professional-segment-arrangement-and-export", "game-sfx-batch-variants-and-zip"]
+    "cli": ["prompt-writing", "audio-generation", "reference-voice-list", "reference-selection", "reference-voice-create-and-preview", "reference-upload", "quota", "task-history-and-status", "private-wav-download"],
+    "websiteOnly": ["saved-character-voice-catalog-import", "audio-rate-and-volume-controls", "script-generator", "audio-to-text", "media-to-sound-script", "professional-segment-arrangement-and-export", "game-sfx-batch-variants-and-zip"]
   }
 }

@@ -4,7 +4,7 @@ description: Write, optimize, or repair Foleyix prompts and create background mu
 license: MIT-0
 metadata:
   author: "Foleyix"
-  version: "1.4.1"
+  version: "1.5.0"
   homepage: "https://foleyix.com/skill"
   openclaw:
     requires:
@@ -26,6 +26,7 @@ This standard Agent Skill works with Codex, Claude Code, Qoder, OpenClaw, Hermes
 - **Write or optimize a prompt:** Read [references/prompt-writing.md](references/prompt-writing.md), then only the relevant speech or sound-design branch it links. Deliver one ready-to-copy prompt in the user's language, preserving the original spoken words, language, references, durations and complete prohibitions. Do not run login, quota, role import, or generation for a prompt-only request.
 - **Repair a prompt after listening:** Use the user's feedback or an inspectable result to identify the specific mismatch. Read the repair guidance in [references/sound-design.md](references/sound-design.md), preserve the working content, and deliver a suggested revision. Regenerate only when the user has requested it; do not claim an unheard revision has fixed the sound.
 - **Create audio:** Prepare the prompt using the writing guidance, or preserve an already-final prompt. Then follow the account and generation workflow below. A request to generate audio authorizes preparation within the supplied intent; it does not authorize changing exact dialogue or adding unrelated sounds. Do not require a second prompt confirmation when the request already authorizes generation and the input is clear.
+- **Create or upload reference audio:** Read [references/cli.md](references/cli.md). Use `voice-create` followed by `voice-preview` for a synthetic voice, or `voice-upload` for a local WAV the user is authorized to use. Metadata creation alone is not a ready reference.
 - **Retrieve an existing result or inspect account/tasks:** Follow the CLI workflow directly; do not rewrite a prompt or create a new task.
 
 Only ask for information that prevents a usable result, such as missing required dialogue or mutually exclusive constraints. For voice references, website controls, model limits or long scripts, consult [references/capabilities.md](references/capabilities.md). Clearer prompts improve expression of intent; optimal sound, exact duration and voice identity still need actual listening evidence.
@@ -35,7 +36,7 @@ Only ask for information that prevents a usable result, such as missing required
 Read [references/audio-capabilities.json](references/audio-capabilities.json) when selecting an audio type, mode or feature. It is packaged from the same catalog consumed by the website controllers, authentication routing and input limits. Audio **type** describes the result; a **mode** is an accepted submission label. Different types can share `free`.
 
 <!-- audio-types:start -->
-| Audio type | CLI mode | Prompt focus |
+| Audio type | CLI mode / workflow | Prompt focus |
 | --- | --- | --- |
 | Podcast / 播客 | `podcast` | Complete host-labelled spoken script and delivery directions; music only when requested. |
 | Ambient sound / 环境音 | `ambience` | A sustained sound environment, foreground/background sources, distance and changes. |
@@ -46,7 +47,7 @@ Read [references/audio-capabilities.json](references/audio-capabilities.json) wh
 | Game sound effects / 游戏音效 | `sfx` | Game action and sound progression. Single clips through CLI; batch, variants and selected ZIP through the website. |
 | Narration / 旁白与朗读 | `narration` | Exact narration text and necessary delivery directions. |
 | Sound scene / 广告、广播剧与声音场景 | `scene` | Exact speech and requested effects, ambience or music in listening order. |
-| Character voice design / 角色音色设计 | Website workflow | Voice description and short preview text; saved reusable reference creation/import requires the website. |
+| Character voice design / 角色音色设计 | `voice-create` + `voice-preview` | Voice description and short preview text; create and preview reusable references with the CLI. Catalog import uses the website. |
 <!-- audio-types:end -->
 
 Background music and songs are distinct: do not apply instrumental-only exclusions to a vocal song, or turn requested sung lyrics into spoken narration. Read [references/sound-design.md](references/sound-design.md) for both music branches and [references/speech.md](references/speech.md) for podcasts and spoken content. Preserve existing lyrics as carefully as existing dialogue.
@@ -92,7 +93,7 @@ Choose the mode that fits the requested result:
 
 Background music and vocal songs both use `free` with their complete respective descriptions; there is no CLI `music`, `bgm` or `song` mode. Mode selection labels the task and does not add sound directions. For prompt preparation, use [references/prompt-writing.md](references/prompt-writing.md); read [references/speech.md](references/speech.md) for spoken content and [references/sound-design.md](references/sound-design.md) for effects, ambience, background music, songs or listening-based repairs. Preserve the user's words and chosen language. Templates and optimization are editable suggestions; submit the final authored prompt.
 
-For reference audio, run `node scripts/foleyix.mjs voices --json` and use the user's chosen saved voice IDs. Bind up to three distinct references with repeated `--voice-id ID` options, in `@voice1`–`@voice3` order. Preserve the user's existing speaker mapping; never guess IDs, substitute voices or imply that typing a marker alone attaches audio. References must belong to the connected account, have a completed preview, and be at most 30 seconds and 10 MB each. The server checks retention and counts the reference description prefix toward the 3,000-character prompt limit. Read [references/cli.md](references/cli.md) for an example. Reference creation/import/upload, audio controls, prompt optimizer, free script generator, project editing, and whole-episode exports use the website.
+For reference audio, run `node scripts/foleyix.mjs voices --json` and use the user's chosen saved voice IDs. Bind up to three distinct references with repeated `--voice-id ID` options, in `@voice1`–`@voice3` order. Preserve the user's existing speaker mapping; never guess IDs, substitute voices or imply that typing a marker alone attaches audio. References must belong to the connected account, have a completed preview, and be at most 30 seconds and 10 MB each. The server checks retention and counts the reference description prefix toward the 3,000-character prompt limit. Read [references/cli.md](references/cli.md) for an example. Create and preview references with `voice-create` and `voice-preview`, or upload an authorized WAV with `voice-upload`. These writes require the separately displayed `voices:write` grant; older connections must run `login` again and wait for user approval. Catalog import, audio controls, prompt optimizer, free script generator, project editing, and whole-episode exports use the website.
 
 ```sh
 node scripts/foleyix.mjs quota --json

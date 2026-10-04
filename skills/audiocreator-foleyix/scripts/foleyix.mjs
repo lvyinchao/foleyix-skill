@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-/** Foleyix 1.4.1 — zero-dependency CLI; Node.js 22.20 or newer. */
+/** Foleyix 1.5.0 — zero-dependency CLI; Node.js 22.20 or newer. */
 import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 
-const VERSION = '1.4.1';
+const VERSION = '1.5.0';
 const CLIENT_ID = 'foleyix-cli';
 const DEFAULT_ORIGIN = 'https://foleyix.com';
 const MODES = ['free', 'narration', 'dialogue', 'podcast', 'scene', 'sfx', 'ambience'];
@@ -48,8 +48,8 @@ function output(value) {
 function note(message) { process.stderr.write(redact(message) + '\n'); }
 function parseArgs() {
   const args = process.argv.slice(2), options = {}, positional = [];
-  const booleans = new Set(['json', 'no-browser', 'no-wait', 'force', 'active', 'help', 'version']);
-  const values = new Set(['origin', 'mode', 'prompt', 'input', 'out', 'request-id', 'timeout', 'cursor', 'limit', 'voice-id']);
+  const booleans = new Set(['json', 'no-browser', 'no-wait', 'force', 'active', 'help', 'version', 'rights-confirmed']);
+  const values = new Set(['origin', 'mode', 'prompt', 'input', 'out', 'request-id', 'timeout', 'cursor', 'limit', 'voice-id', 'name', 'description', 'preview-text', 'kind']);
   for (let i = 0; i < args.length; i++) {
     const argument = args[i];
     if (!argument.startsWith('--')) { positional.push(argument); continue; }
@@ -71,13 +71,16 @@ function parseArgs() {
   const permitted = {
     help: [], version: [], capabilities: [], login: ['no-browser', 'timeout'], whoami: [], logout: [], quota: [], voices: [],
     generate: ['mode', 'prompt', 'input', 'out', 'force', 'no-wait', 'request-id', 'timeout', 'voice-id'],
-    jobs: ['active', 'cursor', 'limit'], status: [], download: ['out', 'force'],
+    'voice-create': ['name', 'description', 'preview-text'],
+    'voice-upload': ['name', 'input', 'rights-confirmed'],
+    'voice-preview': ['out', 'force', 'no-wait', 'request-id', 'timeout'],
+    jobs: ['active', 'cursor', 'limit', 'kind'], status: [], download: ['out', 'force'],
   };
   if (!Object.hasOwn(permitted, command)) fail('invalid_command', 'Unknown command. Run help for available commands.');
   for (const name of Object.keys(options)) {
     if (!['origin', 'json', 'help', 'version'].includes(name) && !permitted[command].includes(name)) fail('invalid_argument', 'This option is not available for the selected command.');
   }
-  if (positional.length !== (['status', 'download'].includes(command) ? 1 : 0)) fail('invalid_argument', 'This command has missing or unexpected positional arguments.');
+  if (positional.length !== (['status', 'download', 'voice-preview'].includes(command) ? 1 : 0)) fail('invalid_argument', 'This command has missing or unexpected positional arguments.');
   return { command, options, positional };
 }
 function serviceOrigin(value, explicit) {
@@ -148,20 +151,22 @@ function serverError(status, data) {
     quota_exceeded: 'Your account does not have enough available audio time.', invalid_input: 'The service rejected this input. Check its length and selected mode.',
     idempotency_conflict: 'This request ID has already been used with different input.', request_key_conflict: 'This request ID has already been used with different input.',
     invalid_voices: 'Select up to three distinct saved reference voices.', voice_not_ready: 'A reference is missing, not owned by this account, or has no completed preview. Run voices and check it on the website.',
+    cli_scope_denied: 'This connection lacks reference write access. Run login again and approve voices:write on the website.',
+    reference_rights_required: 'Confirm you are authorized to use this reference audio with --rights-confirmed.',
     reference_audio_too_long: 'Each reference must be at most 30 seconds.', reference_audio_too_large: 'Each reference must be at most 10 MB.',
     invalid_reference_audio: 'A reference has invalid audio metadata. Check or replace it on the website.',
     invalid_prompt: 'The final prompt, including reference descriptions, must contain 1–3,000 Unicode characters.',
   };
   return new CliError(code, messages[code] || (status === 401 ? 'Website login is required. Run login again.' : 'Foleyix rejected this request.'), { status });
 }
-async function fetchJSON(relative, { method = 'GET', body, token, headers = {} } = {}) {
+async function fetchJSON(relative, { method = 'GET', body, rawBody, token, headers = {} } = {}) {
   if (token) secrets.add(token);
   const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 30000);
   try {
     const response = await fetch(apiUrl(relative), {
       method, signal: controller.signal, redirect: 'error', cache: 'no-store',
       headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: 'Bearer ' + token } : {}), ...headers },
-      body: body ? JSON.stringify(body) : undefined,
+      body: rawBody ?? (body ? JSON.stringify(body) : undefined),
     });
     const raw = await response.text();
     if (raw.length > 1024 * 1024) fail('invalid_response', 'The service response is too large.');
@@ -289,7 +294,7 @@ async function authenticated(relative, options = {}) {
   }
 }
 async function login(options) {
-  const device = await fetchJSON('/api/cli/auth/device-code', { method: 'POST', body: { client_id: CLIENT_ID } });
+  const device = await fetchJSON('/api/cli/auth/device-code', { method: 'POST', body: { client_id: CLIENT_ID, scope: 'audio:read audio:generate voices:write' } });
   if (typeof device.device_code === 'string') secrets.add(device.device_code);
   if (typeof device.device_code !== 'string' || device.device_code.length < 16 || typeof device.user_code !== 'string' || !/^[A-Z0-9-]{4,32}$/.test(device.user_code) || !Number.isFinite(device.expires_in) || device.expires_in < 1 || device.expires_in > 600) fail('invalid_response', 'The device authorization response is incomplete.');
   let verification;
@@ -368,24 +373,24 @@ async function waitForJob(job, timeout) {
   }
   return { job, timedOut: false };
 }
-async function generate(options) {
-  if ((options.prompt === undefined) === (options.input === undefined)) fail('invalid_argument', 'Provide exactly one of --prompt or --input.');
-  const mode = options.mode || 'narration';
-  if (!MODES.includes(mode)) fail('invalid_argument', 'Use ' + MODES.join(', ') + '.');
+async function generate(options, previewVoiceId) {
+  if (!previewVoiceId && (options.prompt === undefined) === (options.input === undefined)) fail('invalid_argument', 'Provide exactly one of --prompt or --input.');
+  const mode = previewVoiceId ? 'voice-design' : options.mode || 'narration';
+  if (!previewVoiceId && !MODES.includes(mode)) fail('invalid_argument', 'Use ' + MODES.join(', ') + '.');
   if (options['no-wait'] && options.out) fail('invalid_argument', '--out requires waiting for the task; remove --no-wait.');
   if (options.force && !options.out) fail('invalid_argument', '--force requires --out.');
   const timeout = integerOption(options.timeout, 600, 3600);
-  let prompt = options.prompt;
+  let prompt = previewVoiceId ? '' : options.prompt;
   if (options.input !== undefined) {
     const file = path.resolve(options.input), stat = await fs.stat(file);
     if (!stat.isFile() || stat.size > 64 * 1024) fail('invalid_input', 'Use a UTF-8 text file no larger than 64 KiB.');
     const bytes = await fs.readFile(file);
     try { prompt = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { fail('invalid_input', 'The input file must contain valid UTF-8 text.'); }
   }
-  if (typeof prompt !== 'string' || !prompt.trim() || Buffer.byteLength(prompt, 'utf8') > 64 * 1024) fail('invalid_input', 'Provide nonempty text no larger than 64 KiB; the service also enforces mode limits.');
+  if (!previewVoiceId && (typeof prompt !== 'string' || !prompt.trim() || Buffer.byteLength(prompt, 'utf8') > 64 * 1024)) fail('invalid_input', 'Provide nonempty text no larger than 64 KiB; the service also enforces mode limits.');
   prompt = prompt.trim();
   if (Array.from(prompt).length > 3000) fail('invalid_input', 'Use no more than 3,000 Unicode characters.');
-  const voiceIds = (options['voice-id'] || []).map(id => identifier(id, 'saved reference voice ID'));
+  const voiceIds = (previewVoiceId ? [previewVoiceId] : options['voice-id'] || []).map(id => identifier(id, 'saved reference voice ID'));
   if (voiceIds.length > MAX_REFERENCE_VOICES || new Set(voiceIds).size !== voiceIds.length) fail('invalid_argument', 'Select up to three distinct saved reference voices with --voice-id, in @voice1–@voice3 order.');
   // Check login before creating an unresolved journal entry.
   await accessToken();
@@ -395,7 +400,7 @@ async function generate(options) {
   else {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        job = publicJob((await authenticated('/api/generations', { method: 'POST', body: { mode, prompt, ...(voiceIds.length ? { voiceIds } : {}) }, headers: { 'Idempotency-Key': record.requestId } })).job);
+        job = publicJob((await authenticated(previewVoiceId ? '/api/generations/voice' : '/api/generations', { method: 'POST', body: previewVoiceId ? { voiceId: previewVoiceId } : { mode, prompt, ...(voiceIds.length ? { voiceIds } : {}) }, headers: { 'Idempotency-Key': record.requestId } })).job);
         await updateRecord(record.requestId, { state: ['succeeded', 'failed'].includes(job.status) ? 'resolved' : job.status === 'unknown' ? 'uncertain' : 'pending', jobId: job.id });
         break;
       } catch (error) {
@@ -420,6 +425,62 @@ async function generate(options) {
   catch (error) { error.details = { ...error.details, jobId: job.id, requestId: record.requestId }; throw error; }
   output({ ok: true, requestId: record.requestId, jobId: job.id, status: result.job.status, timedOut: result.timedOut, job: result.job, ...delivery });
 }
+function voiceText(value, maximum, label) {
+  if (typeof value !== 'string' || !value.trim() || Array.from(value.trim()).length > maximum) fail('invalid_input', `${label} must contain 1–${maximum} Unicode characters.`);
+  return value.trim();
+}
+async function createVoice(options) {
+  const body = { name: voiceText(options.name, 48, 'Voice name'), description: voiceText(options.description, 2048, 'Voice description') };
+  if (options['preview-text'] !== undefined) body.previewText = voiceText(options['preview-text'], 300, 'Preview text');
+  // Metadata creation is not idempotent: never retry an uncertain server write.
+  const value = await authenticated('/api/voices', { method: 'POST', body });
+  output({ ok: true, voice: publicVoice(value.voice), next: 'Run voice-preview with this voice ID to create its reusable audio.' });
+}
+async function uploadVoice(options) {
+  if (!options['rights-confirmed']) fail('reference_rights_required', 'Confirm you are authorized to use this audio with --rights-confirmed.');
+  const name = voiceText(options.name, 48, 'Voice name');
+  if (!options.input) fail('invalid_argument', 'Provide a reference WAV with --input.');
+  const file = path.resolve(options.input), inputStat = await fs.lstat(file);
+  if (!inputStat.isFile() || inputStat.isSymbolicLink()) fail('invalid_reference_audio', 'Use a regular WAV file, not a link or special file.');
+  const handle = await fs.open(file, fsConstants.O_RDONLY | noFollow | (fsConstants.O_NONBLOCK || 0));
+  let bytes;
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size < 44) fail('invalid_reference_audio', 'Use a complete WAV file.');
+    if (stat.size > 10_000_000) fail('reference_audio_too_large', 'Each reference must be at most 10 MB.');
+    // Bound the read even if another process grows the file after stat.
+    bytes = Buffer.alloc(stat.size + 1);
+    let count = 0;
+    while (count < bytes.length) { const read = await handle.read(bytes, count, bytes.length - count, null); if (!read.bytesRead) break; count += read.bytesRead; }
+    if (count !== stat.size) fail('invalid_reference_audio', 'The reference changed while reading. Try again with a stable file.');
+    bytes = bytes.subarray(0, count);
+  } finally { await handle.close(); }
+  const duration = referenceDuration(bytes);
+  if (!(duration > 0)) fail('invalid_reference_audio', 'Use a complete PCM or float WAV supported by the website.');
+  if (duration > 30) fail('reference_audio_too_long', 'Each reference must be at most 30 seconds.');
+  const value = await authenticated('/api/voices/upload', { method: 'POST', rawBody: bytes, headers: { 'Content-Type': 'audio/wav', 'X-Audio-Name': encodeURIComponent(name), 'X-Audio-Rights': 'confirmed' } });
+  output({ ok: true, voice: publicVoice(value.voice) });
+}
+function referenceDuration(bytes) {
+ if(bytes.length<44||String.fromCharCode(...bytes.subarray(0,4))!=='RIFF'||String.fromCharCode(...bytes.subarray(8,12))!=='WAVE')return 0;
+ const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);let byteRate=0,blockAlign=0,data=0,hasFormat=false,hasData=false;
+ if(view.getUint32(4,true)+8!==bytes.length)return 0;
+ for(let offset=12;offset<bytes.length;){
+  if(offset+8>bytes.length)return 0;
+  const kind=String.fromCharCode(...bytes.subarray(offset,offset+4)),length=view.getUint32(offset+4,true),next=offset+8+length+(length%2);
+  if(next>bytes.length)return 0;
+  if(kind==='fmt '){
+   if(hasFormat||length<16)return 0;hasFormat=true;
+   const format=view.getUint16(offset+8,true),channels=view.getUint16(offset+10,true),sampleRate=view.getUint32(offset+12,true),bits=view.getUint16(offset+22,true);
+   byteRate=view.getUint32(offset+16,true);blockAlign=view.getUint16(offset+20,true);
+   if(![1,3].includes(format)||channels<1||channels>8||sampleRate<8000||sampleRate>192000||![8,16,24,32,64].includes(bits)||(format===3&&![32,64].includes(bits))||blockAlign!==channels*bits/8||byteRate!==sampleRate*blockAlign)return 0;
+  }
+  if(kind==='data'){if(hasData)return 0;hasData=true;data=length;}
+  offset=next;
+ }
+ return hasFormat&&hasData&&byteRate&&data%blockAlign===0?data/byteRate:0;
+}
+
 function validateWav(bytes) {
   if (bytes.length < 44 || bytes.toString('ascii', 0, 4) !== 'RIFF' || bytes.toString('ascii', 8, 12) !== 'WAVE' || bytes.readUInt32LE(4) + 8 !== bytes.length) fail('invalid_audio', 'The download is not a complete RIFF/WAVE audio file.');
   let position = 12, format = false, data = false;
@@ -506,9 +567,12 @@ const HELP = [
   'logout                                  Revoke this CLI connection',
   'quota                                   Show shared audio-time quota and queue',
   'voices                                  List your saved reference voices and audio metadata',
+  'voice-create --name name --description text [--preview-text text]',
+  'voice-preview <voiceId> [--out audio.wav] [--force] [--no-wait] [--request-id id] [--timeout seconds]',
+  'voice-upload --input reference.wav --name name --rights-confirmed',
   'generate --prompt text | --input file [--mode free|narration|dialogue|podcast|scene|sfx|ambience]',
   '         [--voice-id id (repeat up to 3)] [--out audio.wav] [--force] [--no-wait] [--request-id id] [--timeout seconds]',
-  'jobs [--active] [--cursor cursor] [--limit 1..100]',
+  'jobs [--active] [--cursor cursor] [--limit 1..100] [--kind simple-generation|voice-design]',
   'status <jobId>',
   'download <jobId> [--out audio.wav] [--force]',
   'Global: --json, --origin https://foleyix.com',
@@ -516,7 +580,7 @@ const HELP = [
   'Generation waits up to 600 seconds by default. A timeout retains the task and request IDs.',
   'Input: up to 3,000 Unicode characters. Default mode: narration; modes do not rewrite the prompt.',
   'Reference IDs come from voices; their order maps to @voice1, @voice2, @voice3. Typing a marker alone does not attach audio.',
-  'Create/import/upload references on the website first. Each reference: at most 30 seconds and 10 MB.',
+  'Create and preview synthetic references or upload authorized WAVs with voices:write. Catalog import uses the website. Each reference: at most 30 seconds and 10 MB.',
   'Credentials stay in a private, per-origin directory; do not copy them into a project.',
 ].join('\n');
 async function main() {
@@ -537,7 +601,7 @@ async function main() {
   if (command === 'logout') return logout();
   if (command === 'whoami') {
     const value = await authenticated('/api/cli/auth/whoami');
-    return output({ ok: true, origin, user: publicUser(value.user), scopes: Array.isArray(value.scopes) ? value.scopes.filter((scope) => ['audio:generate', 'audio:read'].includes(scope)) : [], expiresAt: safeString(value.expiresAt), modelEnabled: value.modelEnabled === true });
+    return output({ ok: true, origin, user: publicUser(value.user), scopes: Array.isArray(value.scopes) ? value.scopes.filter((scope) => ['audio:generate', 'audio:read', 'voices:write'].includes(scope)) : [], expiresAt: safeString(value.expiresAt), modelEnabled: value.modelEnabled === true });
   }
   if (command === 'quota') {
     const value = (await authenticated('/api/quota')).quota;
@@ -550,8 +614,12 @@ async function main() {
     if (!Array.isArray(value.voices)) fail('invalid_response', 'The reference voice response is incomplete.');
     return output({ ok: true, voices: value.voices.map(publicVoice) });
   }
+  if (command === 'voice-create') return createVoice(options);
+  if (command === 'voice-upload') return uploadVoice(options);
+  if (command === 'voice-preview') return generate(options, identifier(positional[0], 'saved reference voice ID'));
   if (command === 'jobs') {
     const query = new URLSearchParams();
+    if (options.kind) { if (!['simple-generation', 'voice-design'].includes(options.kind)) fail('invalid_argument', 'Use simple-generation or voice-design for --kind.'); query.set('kind', options.kind); }
     if (options.active) query.set('active', '1');
     if (options.cursor) query.set('cursor', options.cursor);
     if (options.limit) query.set('limit', String(integerOption(options.limit, 50, 100)));
