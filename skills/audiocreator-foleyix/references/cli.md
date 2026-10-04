@@ -2,6 +2,8 @@
 
 The entrypoint is `node scripts/foleyix.mjs COMMAND`, resolved against the installed skill directory. It requires Node.js 22.20+. Run `help` for all flags.
 
+`capabilities --json` returns the bundled website-aligned audio types, page paths, mapped CLI modes, limits and website-only features. It works without login, network requests or credential-directory creation. Background music and songs both map to `free`, podcasts to `podcast`, environment to `ambience`, effects to `sfx`. This command lists a bundled snapshot; a deployed `https://foleyix.com/audio-capabilities.json` can provide newer website data, but cannot authorize new CLI arguments.
+
 ## Login and storage
 
 `login` creates a ten-minute device authorization and waits for website approval. The short user code and authorization URL appear only on stderr, so `--json` stdout remains parseable. Login never launches the browser or another system program: the user opens the displayed authorization URL manually. `--no-browser` remains accepted for compatibility, including on remote terminals. `--timeout SECONDS` can shorten the wait. Rejected or expired approval returns an explicit error.

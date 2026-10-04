@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const cli = path.join(repository, 'skills/foleyix/scripts/foleyix.mjs');
+const cli = path.join(repository, 'skills/audiocreator-foleyix/scripts/foleyix.mjs');
 const oldAccess = 'access-opaque-fixture-0123456789';
 const oldRefresh = 'refresh-opaque-fixture-0123456789';
 const newAccess = 'access-rotated-fixture-0123456789';
@@ -98,7 +98,7 @@ async function fixture(t, { handler } = {}) {
 test('device login waits for human approval, saves private per-origin login, and never outputs secrets', async (t) => {
   const f = await fixture(t, { handler({ request, body, send, state }) { if (request.url === '/api/cli/auth/token' && body.grant_type !== 'refresh_token' && state.polls++ === 0) { send(400, { error: 'authorization_pending' }); return true; } } });
   const result = await f.run(['login']);
-  assert.equal((await f.run(['version'])).data.version, '1.1.0');
+  assert.equal((await f.run(['version'])).data.version, '1.3.0');
   assert.equal(result.code, 0); assert.equal(result.data.user.email, 'user@example.test'); assert.equal(result.data.modelEnabled, true);
   assert.match(result.stderr, /ABCD-EFGH/); assert.match(result.stderr, /\/activate\?user_code=ABCD-EFGH/);
   const saved = JSON.parse(await fs.readFile(f.credentialPath, 'utf8'));
@@ -120,15 +120,34 @@ test('whoami, shared seconds quota, and history expose only public fields', asyn
   await f.run(['jobs', '--active', '--limit', '50', '--cursor', 'a+b/c']);
   const query = new URL(f.requests.at(-1).url, f.origin).searchParams; assert.equal(query.get('active'), '1'); assert.equal(query.get('cursor'), 'a+b/c');
 });
-test('all five modes and UTF-8 file input generate and deliver complete WAV bytes', async (t) => {
+test('all seven modes and UTF-8 file input generate and deliver complete WAV bytes', async (t) => {
   const f = await fixture(t); await f.seed();
   const text = path.join(f.directory, 'script.txt'); await fs.writeFile(text, '你好，世界。');
-  for (const mode of ['narration', 'dialogue', 'scene', 'sfx', 'ambience']) {
+  for (const mode of ['narration', 'free', 'dialogue', 'podcast', 'scene', 'sfx', 'ambience']) {
     const out = path.join(f.directory, mode + '.wav');
     const args = ['generate', '--mode', mode, ...(mode === 'narration' ? ['--input', text] : ['--prompt', 'A short ' + mode]), '--out', out];
     const result = await f.run(args); assert.equal(result.code, 0); assert.equal(result.data.path, out); assert.equal(result.data.status, 'succeeded'); assert.deepEqual(await fs.readFile(out), audio);
   }
-  assert.deepEqual(f.generationBodies.map((body) => body.mode), ['narration', 'dialogue', 'scene', 'sfx', 'ambience']); assert.equal(f.generationBodies[0].prompt, '你好，世界。');
+  assert.deepEqual(f.generationBodies.map((body) => body.mode), ['narration', 'free', 'dialogue', 'podcast', 'scene', 'sfx', 'ambience']); assert.equal(f.generationBodies[0].prompt, '你好，世界。');
+});
+test('capabilities lists website audio types offline without creating account state', async (t) => {
+  const f = await fixture(t);
+  const result = await f.run(['capabilities']);
+  assert.equal(result.code, 0);
+  const types = result.data.capabilities.types;
+  for (const [id, mode] of [['song', 'free'], ['background-music', 'free'], ['podcast', 'podcast'], ['ambience', 'ambience'], ['sound-effects', 'sfx']]) assert.equal(types.find(type => type.id === id).cliMode, mode);
+  assert.equal(types.find(type => type.id === 'character-voice').cliMode, null);
+  assert.equal(f.requests.length, 0);
+  await assert.rejects(fs.access(f.configRoot));
+});
+test('songs preserve sung lyrics and BGM preserves instrumental directions in their shared free mode', async (t) => {
+  const f = await fixture(t); await f.seed();
+  const prompts = ['Original folk song, warm female singing.\n[Verse]\n月光照着归家的路。\n[Chorus]\n我把思念唱给你听。', 'Instrumental background music, soft piano, gentle pulse. No singing or spoken words.'];
+  for (const [index, prompt] of prompts.entries()) {
+    const result = await f.run(['generate', '--mode', 'free', '--prompt', prompt, '--out', path.join(f.directory, `music-${index}.wav`)]);
+    assert.equal(result.code, 0);
+  }
+  assert.deepEqual(f.generationBodies.map(body => ({ mode: body.mode, prompt: body.prompt })), prompts.map(prompt => ({ mode: 'free', prompt })));
 });
 test('concurrent processes refresh once under lock and keep absolute session expiry', async (t) => {
   const f = await fixture(t); await f.seed({ expiresAt: Date.now() - 1 });
@@ -224,32 +243,32 @@ test('release ZIP is deterministic, has only reviewed skill files, and checksum 
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'foleyix-package-')); t.after(() => fs.rm(temporary, { recursive: true, force: true }));
   const script = path.join(repository, 'scripts/package-foleyix-skill.mjs');
   const first = await child(process.execPath, [script, '--out-dir', path.join(temporary, 'first')]); const second = await child(process.execPath, [script, '--out-dir', path.join(temporary, 'second')]); assert.equal(first.code, 0); assert.equal(second.code, 0);
-  const bytes = await fs.readFile(path.join(temporary, 'first', 'foleyix-skill.zip')); assert.deepEqual(bytes, await fs.readFile(path.join(temporary, 'second', 'foleyix-skill.zip')));
-  const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'first', 'foleyix-skill-manifest.json'), 'utf8')); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length); assert.equal(manifest.version, '1.1.0'); assert.equal(manifest.publicReleased, false);
+  const bytes = await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill.zip')); assert.deepEqual(bytes, await fs.readFile(path.join(temporary, 'second', 'audiocreator-foleyix-skill.zip')));
+  const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill-manifest.json'), 'utf8')); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length); assert.equal(manifest.version, '1.3.0'); assert.equal(manifest.publicReleased, false); assert.equal(manifest.name, 'audiocreator-foleyix');
   const names = []; let offset = 0;
   while (bytes.readUInt32LE(offset) === 0x04034b50) { const size = bytes.readUInt32LE(offset + 18), nameLength = bytes.readUInt16LE(offset + 26), extraLength = bytes.readUInt16LE(offset + 28); names.push(bytes.toString('utf8', offset + 30, offset + 30 + nameLength)); offset += 30 + nameLength + extraLength + size; }
-  assert.deepEqual(names.sort(), ['foleyix/LICENSE', 'foleyix/SKILL.md', 'foleyix/agents/openai.yaml', 'foleyix/references/cli.md', 'foleyix/references/prompt-writing.md', 'foleyix/scripts/foleyix.mjs']);
+  assert.deepEqual(names.sort(), ['audiocreator-foleyix/LICENSE', 'audiocreator-foleyix/SKILL.md', 'audiocreator-foleyix/agents/openai.yaml', 'audiocreator-foleyix/references/audio-capabilities.json', 'audiocreator-foleyix/references/capabilities.md', 'audiocreator-foleyix/references/cli.md', 'audiocreator-foleyix/references/examples.md', 'audiocreator-foleyix/references/prompt-writing.md', 'audiocreator-foleyix/references/sound-design.md', 'audiocreator-foleyix/references/speech.md', 'audiocreator-foleyix/scripts/foleyix.mjs']);
 });
 test('Qoder flat ZIP contains root SKILL.md, preserves audited bytes, and leaves canonical output unchanged', async (t) => {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'foleyix-qoder-package-')); t.after(() => fs.rm(temporary, { recursive: true, force: true }));
   const script = path.join(repository, 'scripts/package-foleyix-skill.mjs');
   const canonical = await child(process.execPath, [script, '--out-dir', temporary]); assert.equal(canonical.code, 0);
-  const canonicalBefore = await fs.readFile(path.join(temporary, 'foleyix-skill.zip'));
+  const canonicalBefore = await fs.readFile(path.join(temporary, 'audiocreator-foleyix-skill.zip'));
   const flat = await child(process.execPath, [script, '--qoder', '--out-dir', temporary]); assert.equal(flat.code, 0);
-  assert.deepEqual(await fs.readFile(path.join(temporary, 'foleyix-skill.zip')), canonicalBefore);
-  const flatPath = path.join(temporary, 'foleyix-qoder.zip'), bytes = await fs.readFile(flatPath);
+  assert.deepEqual(await fs.readFile(path.join(temporary, 'audiocreator-foleyix-skill.zip')), canonicalBefore);
+  const flatPath = path.join(temporary, 'audiocreator-foleyix-qoder.zip'), bytes = await fs.readFile(flatPath);
   const integrity = await child('unzip', ['-t', flatPath]); assert.equal(integrity.code, 0, integrity.stdout + integrity.stderr);
   const entries = []; let offset = 0;
   while (bytes.readUInt32LE(offset) === 0x04034b50) {
     const size = bytes.readUInt32LE(offset + 18), nameLength = bytes.readUInt16LE(offset + 26), extraLength = bytes.readUInt16LE(offset + 28);
     const name = bytes.toString('utf8', offset + 30, offset + 30 + nameLength), bodyOffset = offset + 30 + nameLength + extraLength;
-    entries.push(name); assert.ok(!name.startsWith('foleyix/'));
-    assert.deepEqual(bytes.subarray(bodyOffset, bodyOffset + size), await fs.readFile(path.join(repository, 'skills/foleyix', name)));
+    entries.push(name); assert.ok(!name.startsWith('audiocreator-foleyix/'));
+    assert.deepEqual(bytes.subarray(bodyOffset, bodyOffset + size), await fs.readFile(path.join(repository, 'skills/audiocreator-foleyix', name)));
     offset = bodyOffset + size;
   }
-  assert.deepEqual(entries.sort(), ['LICENSE', 'SKILL.md', 'agents/openai.yaml', 'references/cli.md', 'references/prompt-writing.md', 'scripts/foleyix.mjs']);
-  const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'foleyix-qoder-manifest.json'), 'utf8'));
-  assert.equal(manifest.zip, '/downloads/foleyix-qoder.zip'); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length);
-  assert.equal(await fs.readFile(path.join(temporary, 'foleyix-qoder.sha256'), 'utf8'), manifest.sha256 + '  foleyix-qoder.zip\n');
+  assert.deepEqual(entries.sort(), ['LICENSE', 'SKILL.md', 'agents/openai.yaml', 'references/audio-capabilities.json', 'references/capabilities.md', 'references/cli.md', 'references/examples.md', 'references/prompt-writing.md', 'references/sound-design.md', 'references/speech.md', 'scripts/foleyix.mjs']);
+  const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'audiocreator-foleyix-qoder-manifest.json'), 'utf8'));
+  assert.equal(manifest.zip, '/downloads/audiocreator-foleyix-qoder.zip'); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length);
+  assert.equal(await fs.readFile(path.join(temporary, 'audiocreator-foleyix-qoder.sha256'), 'utf8'), manifest.sha256 + '  audiocreator-foleyix-qoder.zip\n');
   const repeated = await child(process.execPath, [script, '--qoder', '--out-dir', temporary]); assert.equal(repeated.code, 0); assert.deepEqual(await fs.readFile(flatPath), bytes);
 });

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-/** Foleyix 1.1.0 — zero-dependency CLI; Node.js 22.20 or newer. */
+/** Foleyix 1.3.0 — zero-dependency CLI; Node.js 22.20 or newer. */
 import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 
-const VERSION = '1.1.0';
+const VERSION = '1.3.0';
 const CLIENT_ID = 'foleyix-cli';
 const DEFAULT_ORIGIN = 'https://foleyix.com';
 const MODES = ['free', 'narration', 'dialogue', 'podcast', 'scene', 'sfx', 'ambience'];
@@ -67,7 +67,7 @@ function parseArgs() {
   const command = options.help ? 'help' : options.version ? 'version' : positional.shift() || 'help';
   jsonOutput = !!options.json;
   const permitted = {
-    help: [], version: [], login: ['no-browser', 'timeout'], whoami: [], logout: [], quota: [],
+    help: [], version: [], capabilities: [], login: ['no-browser', 'timeout'], whoami: [], logout: [], quota: [],
     generate: ['mode', 'prompt', 'input', 'out', 'force', 'no-wait', 'request-id', 'timeout'],
     jobs: ['active', 'cursor', 'limit'], status: [], download: ['out', 'force'],
   };
@@ -482,6 +482,7 @@ async function downloadJob(job, options) {
 const HELP = [
   'Foleyix ' + VERSION + ' — Node.js 22.20+',
   'Usage: node scripts/foleyix.mjs <command> [options]',
+  'capabilities                            List bundled website-aligned audio types (no login)',
   'login [--no-browser] [--timeout seconds]  Open the displayed website URL manually and approve',
   'whoami                                  Show the connected account',
   'logout                                  Revoke this CLI connection',
@@ -503,6 +504,12 @@ async function main() {
   const { command, options, positional } = parseArgs();
   if (command === 'help') return output({ ok: true, help: HELP });
   if (command === 'version') return output({ ok: true, version: VERSION });
+  if (command === 'capabilities') {
+    const capabilities = JSON.parse(await fs.readFile(new URL('../references/audio-capabilities.json', import.meta.url), 'utf8'));
+    if (capabilities.schemaVersion !== 1 || !Array.isArray(capabilities.types) || !Array.isArray(capabilities.creationModes)
+      || capabilities.creationModes.length !== MODES.length || capabilities.creationModes.some((mode, index) => mode !== MODES[index])) fail('invalid_capabilities', 'The bundled audio capabilities do not match this CLI. Reinstall the complete skill.');
+    return output({ ok: true, version: VERSION, capabilities });
+  }
   origin = serviceOrigin(options.origin || DEFAULT_ORIGIN, options.origin !== undefined);
   await initializeConfig();
   if (command === 'login') return login(options);

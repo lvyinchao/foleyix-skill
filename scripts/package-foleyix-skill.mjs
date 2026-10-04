@@ -6,8 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const source = path.join(repository, 'skills', 'foleyix');
-const files = ['LICENSE', 'SKILL.md', 'agents/openai.yaml', 'references/cli.md', 'references/prompt-writing.md', 'scripts/foleyix.mjs'];
+const skillName = 'audiocreator-foleyix';
+const source = path.join(repository, 'skills', skillName);
+const files = ['LICENSE', 'SKILL.md', 'agents/openai.yaml', 'references/audio-capabilities.json', 'references/capabilities.md', 'references/cli.md', 'references/examples.md', 'references/prompt-writing.md', 'references/sound-design.md', 'references/speech.md', 'scripts/foleyix.mjs'];
 const args = process.argv.slice(2);
 let output = path.join(repository, 'public', 'downloads'), publicReleased = false, qoder = false;
 for (let i = 0; i < args.length; i++) {
@@ -16,8 +17,8 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === '--qoder') qoder = true;
   else throw new Error('Usage: node scripts/package-foleyix-skill.mjs [--out-dir directory] [--public-released] [--qoder]');
 }
-const artifactName = qoder ? 'foleyix-qoder' : 'foleyix-skill';
-const entryPrefix = qoder ? '' : 'foleyix/';
+const artifactName = skillName + (qoder ? '-qoder' : '-skill');
+const entryPrefix = qoder ? '' : skillName + '/';
 const table = Array.from({ length: 256 }, (_, n) => {
   for (let j = 0; j < 8; j++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1;
   return n >>> 0;
@@ -35,6 +36,9 @@ async function validateTree(directory, relative = '') {
     else if (!stat.isFile() || !files.includes(entry)) throw new Error('Unexpected skill file; review before packaging: ' + entry);
   }
 }
+// Website synchronization is validated in the upstream Foleyix project before export.
+const capabilities = JSON.parse(await fs.readFile(path.join(source, 'references/audio-capabilities.json'), 'utf8'));
+if (capabilities.schemaVersion !== 1 || !Array.isArray(capabilities.types)) throw new Error('Invalid bundled audio capability snapshot.');
 await validateTree(source);
 const markdown = await fs.readFile(path.join(source, 'SKILL.md'), 'utf8');
 const version = markdown.match(/^  version: "(\d+\.\d+\.\d+)"$/m)?.[1];
@@ -59,7 +63,7 @@ for (const relative of files) {
 const centralBytes = Buffer.concat(central), end = Buffer.alloc(22);
 end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(files.length, 8); end.writeUInt16LE(files.length, 10); end.writeUInt32LE(centralBytes.length, 12); end.writeUInt32LE(offset, 16);
 const zip = Buffer.concat([...pieces, centralBytes, end]), sha256 = createHash('sha256').update(zip).digest('hex');
-const manifest = { name: 'foleyix', version, zip: '/downloads/' + artifactName + '.zip', sha256, bytes: zip.length, publicReleased };
+const manifest = { name: skillName, version, zip: '/downloads/' + artifactName + '.zip', sha256, bytes: zip.length, publicReleased };
 await fs.mkdir(output, { recursive: true });
 await fs.writeFile(path.join(output, artifactName + '.zip'), zip);
 await fs.writeFile(path.join(output, artifactName + '.sha256'), sha256 + '  ' + artifactName + '.zip\n');

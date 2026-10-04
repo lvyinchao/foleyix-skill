@@ -1,19 +1,19 @@
-# Foleyix Agent Skill
+# Audio Creator · Foleyix
 
-Create free-form sound scenes, narration, dialogue, podcasts, sound effects and ambience through your Foleyix account, then download the finished WAV. This repository contains the portable Agent Skills package and its dependency-free Node CLI.
+Write, optimize and repair prompts for background music, vocal songs, podcasts, ambience, effects, game effects, narration, dialogue, sound scenes and character voices. When generation is requested, use your Foleyix account and download the finished WAV. This repository contains the portable Agent Skills package and its dependency-free Node CLI.
 
-Supported installation targets include Codex, Claude Code, Qoder, OpenClaw and Hermes. Node **22.20 or later** is required. The skill and CLI are MIT-0; audio generation uses your Foleyix account and the same duration allowance as the website. Downloading existing audio does not consume generation time.
+Supported installation targets include Codex, Claude Code, Qoder, OpenClaw and Hermes. Prompt-only work runs offline without login or Node.js. Account operations and generation require Node **22.20 or later**. The skill and CLI are MIT-0; audio generation uses your Foleyix account and the same duration allowance as the website. Downloading existing audio does not consume generation time.
 
 ## Install
 
 ```sh
-npx skills@1.7.0 add lvyinchao/foleyix-skill --skill foleyix --global
+npx skills@1.7.0 add lvyinchao/foleyix-skill --skill audiocreator-foleyix --global
 ```
 
 Select your agent when prompted. Git is required for GitHub installation. A ZIP installation is also available:
 
 ```sh
-npx skills@1.7.0 add https://foleyix.com/downloads/foleyix-skill.zip --skill foleyix --global
+npx skills@1.7.0 add https://foleyix.com/downloads/audiocreator-foleyix-skill.zip --skill audiocreator-foleyix --global
 ```
 
 You can give your agent this instruction:
@@ -21,6 +21,18 @@ You can give your agent this instruction:
 > Install the Foleyix skill from https://foleyix.com/skill, then run its CLI login and wait for me to authorize it on the website.
 
 Chinese installation guide: [foleyix.com/zh/skill](https://foleyix.com/zh/skill).
+
+The skill identifier is `$audiocreator-foleyix` (renamed from `$foleyix`). The GitHub repository URL remains unchanged. Remove an older local `foleyix` skill after installing this replacement if your agent still shows both; existing account connections use the same private configuration directory.
+
+## Audio types and website synchronization
+
+Background music is instrumental; songs include singing or rap and exact lyrics. Both use `--mode free`. Podcasts use `--mode podcast`, environment recordings use `--mode ambience`, and standalone effects use `--mode sfx`.
+
+```sh
+node scripts/foleyix.mjs capabilities --json
+```
+
+This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. Website reference upload/selection, saved voices, game batches and programme editing/export remain website workflows; no unsupported CLI parameters are implied.
 
 ## Connect your account
 
@@ -48,9 +60,9 @@ Modes: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. T
 
 Keep the job ID if generation times out or its result is unknown. Follow that job with `status`, then use `download`; do not automatically create another generation to retry the same request. Use the same `--request-id` when resuming a request whose initial response was lost.
 
-For characters, dialogue, music, effects and current inspiration examples, read the [prompt writing guide](skills/foleyix/references/prompt-writing.md). Reference uploads, @ voice binding, prompt optimization and professional exports use the website.
+For characters, dialogue, music, effects and current inspiration examples, read the [prompt writing guide](skills/audiocreator-foleyix/references/prompt-writing.md). Reference uploads, @ voice binding, prompt optimization and professional exports use the website.
 
-See [CLI reference](skills/foleyix/references/cli.md) and [SKILL.md](skills/foleyix/SKILL.md) for the complete workflow.
+See [CLI reference](skills/audiocreator-foleyix/references/cli.md) and [SKILL.md](skills/audiocreator-foleyix/SKILL.md) for the complete workflow.
 
 ## Service and license
 
