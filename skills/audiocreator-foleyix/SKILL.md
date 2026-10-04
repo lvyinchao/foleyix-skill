@@ -4,7 +4,7 @@ description: Write, optimize, or repair Foleyix prompts and create background mu
 license: MIT-0
 metadata:
   author: "Foleyix"
-  version: "1.3.0"
+  version: "1.4.0"
   homepage: "https://foleyix.com/skill"
   openclaw:
     requires:
@@ -92,7 +92,7 @@ Choose the mode that fits the requested result:
 
 Background music and vocal songs both use `free` with their complete respective descriptions; there is no CLI `music`, `bgm` or `song` mode. Mode selection labels the task and does not add sound directions. For prompt preparation, use [references/prompt-writing.md](references/prompt-writing.md); read [references/speech.md](references/speech.md) for spoken content and [references/sound-design.md](references/sound-design.md) for effects, ambience, background music, songs or listening-based repairs. Preserve the user's words and chosen language. Templates and optimization are editable suggestions; submit the final authored prompt.
 
-Use synthetic character descriptions in CLI prompts. The website's reference-audio selection with `@voice1`–`@voice3`, reference upload, audio controls, prompt optimizer, free script generator, project editing, and whole-episode exports require website workflows; this CLI accepts only mode and prompt and cannot bind reference audio. Do not imply that typing an @ marker into a CLI prompt attaches a voice.
+For reference audio, run `node scripts/foleyix.mjs voices --json` and use the user's chosen saved voice IDs. Bind up to three distinct references with repeated `--voice-id ID` options, in `@voice1`–`@voice3` order. Preserve the user's existing speaker mapping; never guess IDs, substitute voices or imply that typing a marker alone attaches audio. References must belong to the connected account, have a completed preview, and be at most 30 seconds and 10 MB each. The server checks retention and counts the reference description prefix toward the 3,000-character prompt limit. Read [references/cli.md](references/cli.md) for an example. Reference creation/import/upload, audio controls, prompt optimizer, free script generator, project editing, and whole-episode exports use the website.
 
 ```sh
 node scripts/foleyix.mjs quota --json

@@ -1,18 +1,19 @@
 #!/usr/bin/env node
-/** Foleyix 1.3.0 — zero-dependency CLI; Node.js 22.20 or newer. */
+/** Foleyix 1.4.0 — zero-dependency CLI; Node.js 22.20 or newer. */
 import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const CLIENT_ID = 'foleyix-cli';
 const DEFAULT_ORIGIN = 'https://foleyix.com';
 const MODES = ['free', 'narration', 'dialogue', 'podcast', 'scene', 'sfx', 'ambience'];
 const STATES = ['queued', 'running', 'succeeded', 'failed', 'unknown'];
 const WAV_MIMES = ['audio/wav', 'audio/wave', 'audio/x-wav', 'audio/vnd.wave'];
 const MAX_AUDIO_BYTES = 128 * 1024 * 1024;
+const MAX_REFERENCE_VOICES = 3;
 const secrets = new Set();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const hash = (value) => createHash('sha256').update(value).digest('hex');
@@ -48,27 +49,28 @@ function note(message) { process.stderr.write(redact(message) + '\n'); }
 function parseArgs() {
   const args = process.argv.slice(2), options = {}, positional = [];
   const booleans = new Set(['json', 'no-browser', 'no-wait', 'force', 'active', 'help', 'version']);
-  const values = new Set(['origin', 'mode', 'prompt', 'input', 'out', 'request-id', 'timeout', 'cursor', 'limit']);
+  const values = new Set(['origin', 'mode', 'prompt', 'input', 'out', 'request-id', 'timeout', 'cursor', 'limit', 'voice-id']);
   for (let i = 0; i < args.length; i++) {
     const argument = args[i];
     if (!argument.startsWith('--')) { positional.push(argument); continue; }
     const separator = argument.indexOf('=');
     const name = argument.slice(2, separator < 0 ? undefined : separator);
-    if (Object.hasOwn(options, name)) fail('invalid_argument', 'An option was provided more than once.');
+    if (name !== 'voice-id' && Object.hasOwn(options, name)) fail('invalid_argument', 'An option was provided more than once.');
     if (booleans.has(name)) {
       if (separator >= 0) fail('invalid_argument', 'Boolean options do not take a value.');
       options[name] = true;
     } else if (values.has(name)) {
       const value = separator >= 0 ? argument.slice(separator + 1) : args[++i];
       if (value === undefined || value.startsWith('--')) fail('invalid_argument', 'An option is missing its value.');
-      options[name] = value;
+      if (name === 'voice-id') (options[name] ||= []).push(value);
+      else options[name] = value;
     } else fail('invalid_argument', 'An unsupported option was provided. Run help to see supported options.');
   }
   const command = options.help ? 'help' : options.version ? 'version' : positional.shift() || 'help';
   jsonOutput = !!options.json;
   const permitted = {
-    help: [], version: [], capabilities: [], login: ['no-browser', 'timeout'], whoami: [], logout: [], quota: [],
-    generate: ['mode', 'prompt', 'input', 'out', 'force', 'no-wait', 'request-id', 'timeout'],
+    help: [], version: [], capabilities: [], login: ['no-browser', 'timeout'], whoami: [], logout: [], quota: [], voices: [],
+    generate: ['mode', 'prompt', 'input', 'out', 'force', 'no-wait', 'request-id', 'timeout', 'voice-id'],
     jobs: ['active', 'cursor', 'limit'], status: [], download: ['out', 'force'],
   };
   if (!Object.hasOwn(permitted, command)) fail('invalid_command', 'Unknown command. Run help for available commands.');
@@ -106,6 +108,15 @@ function publicUser(value) {
   if (!value || typeof value !== 'object') fail('invalid_response', 'The account response is incomplete.');
   return { id: safeString(value.id), email: safeString(value.email), name: safeString(value.name) };
 }
+function publicVoice(value) {
+  if (!value || typeof value !== 'object' || typeof value.id !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(value.id)
+    || typeof value.name !== 'string' || typeof value.status !== 'string') fail('invalid_response', 'The reference voice response is incomplete.');
+  const audio = value.referenceAudio;
+  return { id: value.id, name: safeString(value.name, 48), description: safeString(value.description, 2048),
+    status: safeString(value.status, 32), source: ['catalog', 'upload', 'design'].includes(value.source) ? value.source : null,
+    assetId: safeString(value.assetId, 128), referenceAudio: audio && Number.isFinite(audio.duration) && Number.isSafeInteger(audio.bytes)
+      ? { duration: audio.duration, bytes: audio.bytes } : null };
+}
 function publicJob(value) {
   if (!value || typeof value !== 'object' || !STATES.includes(value.status)) fail('invalid_response', 'The task response is incomplete.');
   identifier(value.id, 'task ID');
@@ -136,6 +147,10 @@ function serverError(status, data) {
     model_disabled: 'Audio generation is currently unavailable on this service.', service_not_ready: 'Audio generation is currently unavailable on this service.',
     quota_exceeded: 'Your account does not have enough available audio time.', invalid_input: 'The service rejected this input. Check its length and selected mode.',
     idempotency_conflict: 'This request ID has already been used with different input.', request_key_conflict: 'This request ID has already been used with different input.',
+    invalid_voices: 'Select up to three distinct saved reference voices.', voice_not_ready: 'A reference is missing, not owned by this account, or has no completed preview. Run voices and check it on the website.',
+    reference_audio_too_long: 'Each reference must be at most 30 seconds.', reference_audio_too_large: 'Each reference must be at most 10 MB.',
+    invalid_reference_audio: 'A reference has invalid audio metadata. Check or replace it on the website.',
+    invalid_prompt: 'The final prompt, including reference descriptions, must contain 1–3,000 Unicode characters.',
   };
   return new CliError(code, messages[code] || (status === 401 ? 'Website login is required. Run login again.' : 'Foleyix rejected this request.'), { status });
 }
@@ -317,8 +332,9 @@ async function logout() {
 async function getJob(id) {
   return publicJob((await authenticated('/api/jobs/' + encodeURIComponent(identifier(id, 'task ID')))).job);
 }
-async function requestRecord(prompt, mode, requestedId) {
-  const inputHash = hash(JSON.stringify({ mode, prompt }));
+async function requestRecord(prompt, mode, requestedId, voiceIds) {
+  // Keep historical no-reference fingerprints; reference order defines @voiceN.
+  const inputHash = hash(JSON.stringify({ mode, prompt, ...(voiceIds.length ? { voiceIds } : {}) }));
   return withLock(async () => {
     const journal = await readPrivate(config.journal) || { origin, requests: {} };
     if (journal.origin !== origin || !journal.requests || typeof journal.requests !== 'object' || Array.isArray(journal.requests)) fail('invalid_config', 'The saved request journal is invalid.');
@@ -369,15 +385,17 @@ async function generate(options) {
   if (typeof prompt !== 'string' || !prompt.trim() || Buffer.byteLength(prompt, 'utf8') > 64 * 1024) fail('invalid_input', 'Provide nonempty text no larger than 64 KiB; the service also enforces mode limits.');
   prompt = prompt.trim();
   if (Array.from(prompt).length > 3000) fail('invalid_input', 'Use no more than 3,000 Unicode characters.');
+  const voiceIds = (options['voice-id'] || []).map(id => identifier(id, 'saved reference voice ID'));
+  if (voiceIds.length > MAX_REFERENCE_VOICES || new Set(voiceIds).size !== voiceIds.length) fail('invalid_argument', 'Select up to three distinct saved reference voices with --voice-id, in @voice1–@voice3 order.');
   // Check login before creating an unresolved journal entry.
   await accessToken();
-  const record = await requestRecord(prompt, mode, options['request-id']);
+  const record = await requestRecord(prompt, mode, options['request-id'], voiceIds);
   let job;
   if (record.jobId) job = await getJob(record.jobId);
   else {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        job = publicJob((await authenticated('/api/generations', { method: 'POST', body: { mode, prompt }, headers: { 'Idempotency-Key': record.requestId } })).job);
+        job = publicJob((await authenticated('/api/generations', { method: 'POST', body: { mode, prompt, ...(voiceIds.length ? { voiceIds } : {}) }, headers: { 'Idempotency-Key': record.requestId } })).job);
         await updateRecord(record.requestId, { state: ['succeeded', 'failed'].includes(job.status) ? 'resolved' : job.status === 'unknown' ? 'uncertain' : 'pending', jobId: job.id });
         break;
       } catch (error) {
@@ -487,8 +505,9 @@ const HELP = [
   'whoami                                  Show the connected account',
   'logout                                  Revoke this CLI connection',
   'quota                                   Show shared audio-time quota and queue',
+  'voices                                  List your saved reference voices and audio metadata',
   'generate --prompt text | --input file [--mode free|narration|dialogue|podcast|scene|sfx|ambience]',
-  '         [--out audio.wav] [--force] [--no-wait] [--request-id id] [--timeout seconds]',
+  '         [--voice-id id (repeat up to 3)] [--out audio.wav] [--force] [--no-wait] [--request-id id] [--timeout seconds]',
   'jobs [--active] [--cursor cursor] [--limit 1..100]',
   'status <jobId>',
   'download <jobId> [--out audio.wav] [--force]',
@@ -496,6 +515,8 @@ const HELP = [
   'Login always displays the authorization URL; --no-browser is retained for compatibility.',
   'Generation waits up to 600 seconds by default. A timeout retains the task and request IDs.',
   'Input: up to 3,000 Unicode characters. Default mode: narration; modes do not rewrite the prompt.',
+  'Reference IDs come from voices; their order maps to @voice1, @voice2, @voice3. Typing a marker alone does not attach audio.',
+  'Create/import/upload references on the website first. Each reference: at most 30 seconds and 10 MB.',
   'Credentials stay in a private, per-origin directory; do not copy them into a project.',
 ].join('\n');
 async function main() {
@@ -523,6 +544,11 @@ async function main() {
     if (!value || typeof value !== 'object') fail('invalid_response', 'The quota response is incomplete.');
     const quota = Object.fromEntries(['plan', 'generationUnit', 'generationLimit', 'generationUsed', 'generationReserved', 'exportLimit', 'exportUsed', 'exportReserved', 'projectLimit', 'storageLimit', 'storageUsed', 'queueLimit', 'queueUsed', 'periodEnd'].filter((key) => typeof value[key] === 'string' || Number.isFinite(value[key]) || value[key] === null).map((key) => [key, value[key]]));
     return output({ ok: true, quota });
+  }
+  if (command === 'voices') {
+    const value = await authenticated('/api/voices');
+    if (!Array.isArray(value.voices)) fail('invalid_response', 'The reference voice response is incomplete.');
+    return output({ ok: true, voices: value.voices.map(publicVoice) });
   }
   if (command === 'jobs') {
     const query = new URLSearchParams();

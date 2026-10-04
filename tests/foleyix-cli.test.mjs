@@ -98,7 +98,7 @@ async function fixture(t, { handler } = {}) {
 test('device login waits for human approval, saves private per-origin login, and never outputs secrets', async (t) => {
   const f = await fixture(t, { handler({ request, body, send, state }) { if (request.url === '/api/cli/auth/token' && body.grant_type !== 'refresh_token' && state.polls++ === 0) { send(400, { error: 'authorization_pending' }); return true; } } });
   const result = await f.run(['login']);
-  assert.equal((await f.run(['version'])).data.version, '1.3.0');
+  assert.equal((await f.run(['version'])).data.version, '1.4.0');
   assert.equal(result.code, 0); assert.equal(result.data.user.email, 'user@example.test'); assert.equal(result.data.modelEnabled, true);
   assert.match(result.stderr, /ABCD-EFGH/); assert.match(result.stderr, /\/activate\?user_code=ABCD-EFGH/);
   const saved = JSON.parse(await fs.readFile(f.credentialPath, 'utf8'));
@@ -148,6 +148,53 @@ test('songs preserve sung lyrics and BGM preserves instrumental directions in th
     assert.equal(result.code, 0);
   }
   assert.deepEqual(f.generationBodies.map(body => ({ mode: body.mode, prompt: body.prompt })), prompts.map(prompt => ({ mode: 'free', prompt })));
+});
+
+test('owned reference listing exposes only public metadata; ordered binding and recovery keep the correct speakers', async t => {
+  const f = await fixture(t, { handler({request, send}) {
+    if (request.url !== '/api/voices') return;
+    assert.equal(request.headers.authorization, 'Bearer ' + oldAccess);
+    send(200, {voices: [{id:'saved-lin',name:'林',description:'Soft synthetic voice',status:'done',source:'catalog',assetId:'reference-asset',referenceAudio:{duration:2,bytes:64044},r2_key:'private/bucket/key',privateToken:oldAccess}]});
+    return true;
+  }});
+  await f.seed();
+  const voices = await f.run(['voices']);
+  assert.equal(voices.code, 0); assert.deepEqual(voices.data.voices[0], {id:'saved-lin',name:'林',description:'Soft synthetic voice',status:'done',source:'catalog',assetId:'reference-asset',referenceAudio:{duration:2,bytes:64044}});
+  const prompt = '林（@voice1）：“你还是来了。” 周（@voice2）：“我答应过你。”';
+  const args = ['generate','--mode','dialogue','--prompt',prompt,'--voice-id','saved-lin','--voice-id=saved-zhou','--voice-id','saved-third','--request-id','ordered-voices'];
+  const out = path.join(f.directory, 'reference-dialogue.wav');
+  assert.equal((await f.run([...args,'--out',out])).code, 0);
+  assert.deepEqual(await fs.readFile(out), audio);
+  assert.deepEqual(f.generationBodies, [{mode:'dialogue',prompt,voiceIds:['saved-lin','saved-zhou','saved-third']}]);
+  assert.equal((await f.run(args)).code, 0); assert.equal(f.state.generationCount, 1);
+  for (const ids of [['saved-zhou','saved-lin','saved-third'], ['saved-lin'], []]) {
+    const retry = await f.run(['generate','--mode','dialogue','--prompt',prompt,'--request-id','ordered-voices',...ids.flatMap(id => ['--voice-id',id])]);
+    assert.equal(retry.data.error.code, 'idempotency_conflict');
+  }
+  assert.equal(f.state.generationCount, 1);
+});
+
+test('invalid reference arguments fail before authentication, journal writes and generation', async t => {
+  const f = await fixture(t);
+  for (const ids of [['a','b','c','d'],['same','same'],['../local.wav'],[''],['a'.repeat(129)]]) {
+    const result = await f.run(['generate','--prompt','Exact spoken words.',...ids.flatMap(id => ['--voice-id',id])]);
+    assert.equal(result.data.error.code,'invalid_argument');
+  }
+  assert.equal((await f.run(['voices','--voice-id','a'])).data.error.code,'invalid_argument');
+  assert.equal(f.requests.length,0);
+  await assert.rejects(fs.access(path.join(f.configDirectory,'requests.json')));
+});
+
+test('reference rejection is explicit and never retried or replaced with an unbound request', async t => {
+  const f = await fixture(t, {handler({request, body, send}) {
+    if (request.url !== '/api/generations') return;
+    assert.deepEqual(body.voiceIds,['foreign-voice']); send(400,{code:'voice_not_ready',error:'Untrusted private server detail'}); return true;
+  }});
+  await f.seed();
+  const result = await f.run(['generate','--prompt','@voice1: Hello.','--voice-id','foreign-voice']);
+  assert.equal(result.code,1); assert.equal(result.data.error.code,'voice_not_ready'); assert.match(result.data.error.message,/owned/);
+  assert.ok(!result.stdout.includes('Untrusted private server detail'));
+  assert.equal(f.requests.filter(request=>request.url==='/api/generations').length,1);
 });
 test('concurrent processes refresh once under lock and keep absolute session expiry', async (t) => {
   const f = await fixture(t); await f.seed({ expiresAt: Date.now() - 1 });
@@ -244,7 +291,7 @@ test('release ZIP is deterministic, has only reviewed skill files, and checksum 
   const script = path.join(repository, 'scripts/package-foleyix-skill.mjs');
   const first = await child(process.execPath, [script, '--out-dir', path.join(temporary, 'first')]); const second = await child(process.execPath, [script, '--out-dir', path.join(temporary, 'second')]); assert.equal(first.code, 0); assert.equal(second.code, 0);
   const bytes = await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill.zip')); assert.deepEqual(bytes, await fs.readFile(path.join(temporary, 'second', 'audiocreator-foleyix-skill.zip')));
-  const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill-manifest.json'), 'utf8')); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length); assert.equal(manifest.version, '1.3.0'); assert.equal(manifest.publicReleased, false); assert.equal(manifest.name, 'audiocreator-foleyix');
+  const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill-manifest.json'), 'utf8')); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length); assert.equal(manifest.version, '1.4.0'); assert.equal(manifest.publicReleased, false); assert.equal(manifest.name, 'audiocreator-foleyix');
   const names = []; let offset = 0;
   while (bytes.readUInt32LE(offset) === 0x04034b50) { const size = bytes.readUInt32LE(offset + 18), nameLength = bytes.readUInt16LE(offset + 26), extraLength = bytes.readUInt16LE(offset + 28); names.push(bytes.toString('utf8', offset + 30, offset + 30 + nameLength)); offset += 30 + nameLength + extraLength + size; }
   assert.deepEqual(names.sort(), ['audiocreator-foleyix/LICENSE', 'audiocreator-foleyix/SKILL.md', 'audiocreator-foleyix/agents/openai.yaml', 'audiocreator-foleyix/references/audio-capabilities.json', 'audiocreator-foleyix/references/capabilities.md', 'audiocreator-foleyix/references/cli.md', 'audiocreator-foleyix/references/examples.md', 'audiocreator-foleyix/references/prompt-writing.md', 'audiocreator-foleyix/references/sound-design.md', 'audiocreator-foleyix/references/speech.md', 'audiocreator-foleyix/scripts/foleyix.mjs']);

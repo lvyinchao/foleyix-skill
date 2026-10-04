@@ -24,7 +24,20 @@ The CLI writes a request ID and input hash before contacting the service; prompt
 node scripts/foleyix.mjs generate --mode sfx --prompt "One ceramic cup lands on a wooden table." --request-id SAVED_ID --out ./cup.wav --json
 ```
 
-The same ID with different input is refused. If the existing request already has a task ID, resuming queries that task without resubmitting. An `unknown` model result is never replaced automatically.
+The same ID with different input, reference IDs or reference order is refused. Resume with exactly the same ordered `--voice-id` options. Requests without references retain their earlier fingerprints. If the existing request already has a task ID, resuming queries that task without resubmitting. An `unknown` model result is never replaced automatically.
+
+## Reference audio
+
+`voices --json` lists the connected account's saved reference IDs, names, descriptions, status, source and duration/bytes. Choose only the references requested by the user, with `status: done`, an asset, and valid metadata. Create, import or upload a reference on the website first; public catalog IDs, local file paths and provider voice IDs are not saved reference IDs.
+
+```sh
+node scripts/foleyix.mjs voices --json
+node scripts/foleyix.mjs generate --mode dialogue --prompt '林（@voice1）轻声说：“你还是来了。” 周（@voice2）回答：“我答应过你。”' --voice-id SAVED_LIN_ID --voice-id SAVED_ZHOU_ID --out ./dialogue.wav --json
+```
+
+Replace the example IDs with actual IDs from `voices`. Repeat `--voice-id` up to three times: first maps to `@voice1`, second to `@voice2`, third to `@voice3`. IDs must be distinct. Typing a marker without its reference option attaches no audio. The CLI sends the prompt and ordered IDs separately; the service adds the same reference description prefix as the website and sends the matching audio in that order.
+
+Each reference must be owned by this account, completed, retained, at most 30 seconds and 10,000,000 bytes. The server rechecks these conditions before quota reservation and validates the real WAV before the model call. The final compiled prompt, including reference descriptions, must stay within 3,000 Unicode code points; leave room for the prefix. Failed checks return explicit errors and do not substitute a different voice. References guide identity; matching sound still requires listening.
 
 Generation waits 600 seconds by default; `--timeout SECONDS` allows 1–3600 seconds. A wait timeout is a successful query outcome with `status: queued|running`, `timedOut: true`, `requestId`, and `jobId`. It does not mean the audio succeeded. Use `status JOB_ID` and `download JOB_ID` afterward. `--no-wait` returns immediately and cannot be combined with `--out`.
 
@@ -48,4 +61,4 @@ Use `error.code`, not English message text, for recovery. `not_logged_in`/`login
 
 `quota` returns generation seconds (`generationLimit`, `generationUsed`, `generationReserved`), storage bytes (`storageLimit`, `storageUsed`), queue slots (`queueLimit`, `queueUsed`) and any export allowance. Available generation time is `generationLimit - generationUsed - generationReserved`; available storage is `storageLimit - storageUsed`. A queued or running task can hold seconds until it settles or fails. Export fields describe account quota; they do not expose an export command.
 
-The CLI authorizes only generation from mode and prompt plus account/task/audio reads. Reference selection and upload, @ voice binding, rate/volume controls, prompt optimization, free script creation, professional project assembly and episode export use the website. Read [prompt-writing.md](prompt-writing.md) for scene structure and public examples.
+The CLI authorizes standalone generation with mode, prompt and optional ordered reference IDs, plus account/task/audio reads and the owned reference list. Reference creation/import/upload, rate/volume controls, prompt optimization, free script creation, professional project assembly and episode export use the website. Read [prompt-writing.md](prompt-writing.md) for scene structure and public examples.

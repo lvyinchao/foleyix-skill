@@ -32,7 +32,7 @@ Background music is instrumental; songs include singing or rap and exact lyrics.
 node scripts/foleyix.mjs capabilities --json
 ```
 
-This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. Website reference upload/selection, saved voices, game batches and programme editing/export remain website workflows; no unsupported CLI parameters are implied.
+This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. CLI 1.4.0 can list and bind your saved reference voices. Reference creation/import/upload, game batches and programme editing/export use the website.
 
 ## Connect your account
 
@@ -46,7 +46,7 @@ node scripts/foleyix.mjs quota
 
 Login prints a Foleyix authorization URL and short code. Open that URL manually in your browser, sign in, match the displayed account and code with your terminal, then approve the connection. The agent must wait for your approval. The CLI never launches a browser or another system program; `login --no-browser` remains accepted for compatibility.
 
-The CLI authorization can generate audio, read your allowance and jobs, and download your private audio. It cannot manage projects, voices, account settings, payments or the operations dashboard. Credentials stay outside the skill and project files. Use `logout` to revoke this CLI connection while retaining your website session.
+The CLI authorization can generate audio, read your allowance, jobs and saved reference voices, and download your private audio. It cannot create/edit/delete voices, manage projects, account settings, payments or the operations dashboard. Credentials stay outside the skill and project files. Use `logout` to revoke this CLI connection while retaining your website session.
 
 ## Create audio
 
@@ -60,9 +60,18 @@ Modes: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. T
 
 Keep the job ID if generation times out or its result is unknown. Follow that job with `status`, then use `download`; do not automatically create another generation to retry the same request. Use the same `--request-id` when resuming a request whose initial response was lost.
 
-For characters, dialogue, music, effects and current inspiration examples, read the [prompt writing guide](skills/audiocreator-foleyix/references/prompt-writing.md). Reference uploads, @ voice binding, prompt optimization and professional exports use the website.
+For characters, dialogue, music, effects and current inspiration examples, read the [prompt writing guide](skills/audiocreator-foleyix/references/prompt-writing.md). Reference uploads, prompt optimization and professional exports use the website. To attach saved references, use the ordered CLI options below.
 
 See [CLI reference](skills/audiocreator-foleyix/references/cli.md) and [SKILL.md](skills/audiocreator-foleyix/SKILL.md) for the complete workflow.
+
+## Bind reference audio (1.4.0)
+
+```sh
+node scripts/foleyix.mjs voices --json
+node scripts/foleyix.mjs generate --mode dialogue --prompt '@voice1: Hello. @voice2: Welcome back.' --voice-id SAVED_FIRST_ID --voice-id SAVED_SECOND_ID --out ./dialogue.wav --json
+```
+
+Replace the IDs with your chosen saved references from `voices`. Repeat `--voice-id` up to three times; order maps to `@voice1`, `@voice2`, `@voice3`. Typing a marker alone attaches no audio. References must be distinct, owned, completed and retained, at most 30 seconds and 10 MB each. The service uses the same reference validation and model binding as the website. The compiled prompt including reference descriptions must fit within 3,000 Unicode characters. Resume with the same reference IDs in the same order and the same request ID.
 
 ## Service and license
 
