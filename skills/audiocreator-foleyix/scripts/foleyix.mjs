@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-/** Foleyix 1.4.0 — zero-dependency CLI; Node.js 22.20 or newer. */
+/** Foleyix 1.4.1 — zero-dependency CLI; Node.js 22.20 or newer. */
 import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 
-const VERSION = '1.4.0';
+const VERSION = '1.4.1';
 const CLIENT_ID = 'foleyix-cli';
 const DEFAULT_ORIGIN = 'https://foleyix.com';
 const MODES = ['free', 'narration', 'dialogue', 'podcast', 'scene', 'sfx', 'ambience'];

@@ -32,7 +32,7 @@ Background music is instrumental; songs include singing or rap and exact lyrics.
 node scripts/foleyix.mjs capabilities --json
 ```
 
-This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. CLI 1.4.0 can list and bind your saved reference voices. Reference creation/import/upload, game batches and programme editing/export use the website.
+This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. CLI 1.4.1 can list and bind your saved reference voices. Reference creation/import/upload, game batches and programme editing/export use the website.
 
 ## Connect your account
 
@@ -64,7 +64,7 @@ For characters, dialogue, music, effects and current inspiration examples, read 
 
 See [CLI reference](skills/audiocreator-foleyix/references/cli.md) and [SKILL.md](skills/audiocreator-foleyix/SKILL.md) for the complete workflow.
 
-## Bind reference audio (1.4.0)
+## Bind reference audio (1.4.1)
 
 ```sh
 node scripts/foleyix.mjs voices --json

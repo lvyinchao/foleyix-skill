@@ -4,7 +4,7 @@ description: Write, optimize, or repair Foleyix prompts and create background mu
 license: MIT-0
 metadata:
   author: "Foleyix"
-  version: "1.4.0"
+  version: "1.4.1"
   homepage: "https://foleyix.com/skill"
   openclaw:
     requires:
@@ -41,7 +41,7 @@ Read [references/audio-capabilities.json](references/audio-capabilities.json) wh
 | Ambient sound / 环境音 | `ambience` | A sustained sound environment, foreground/background sources, distance and changes. |
 | Sound effects / 音效 | `sfx` | Sound source, action, material, texture, timing and decay. |
 | Dialogue / 多角色对白 | `dialogue` | Stable speaker labels, exact lines and outside-the-lines performance directions. |
-| Background music / 背景音乐 | `free` | Instrumental music: style, mood, instruments, rhythm, development and ending; no singing or lyrics. |
+| AI music / AI 音乐 | `free` | Instrumental music: style, mood, instruments, rhythm, development and ending; no singing or lyrics. |
 | Song / 人声歌曲 | `free` | Original vocal song: genre, singing/rap delivery, instruments, section order and exact lyrics to sing. |
 | Game sound effects / 游戏音效 | `sfx` | Game action and sound progression. Single clips through CLI; batch, variants and selected ZIP through the website. |
 | Narration / 旁白与朗读 | `narration` | Exact narration text and necessary delivery directions. |
