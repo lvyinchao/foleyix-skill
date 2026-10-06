@@ -1,10 +1,10 @@
 ---
 name: audiocreator-foleyix
-description: Write, optimize, or repair Foleyix prompts and create background music, songs with vocals and lyrics, podcasts, ambience, sound effects, game effects, narration, dialogue, and sound scenes. Keep audio types and limits aligned with the website; check tasks and quota, then download private WAV results when generation is requested.
+description: Direct sound, write, optimize, or repair Foleyix prompts and create background music, songs with vocals and lyrics, podcasts, ambience, sound effects, game effects, narration, dialogue, and sound scenes. Keep audio types and limits aligned with the website; check tasks and quota, then download private WAV results when generation is requested.
 license: MIT-0
 metadata:
   author: "Foleyix"
-  version: "1.5.0"
+  version: "1.6.0"
   homepage: "https://foleyix.com/skill"
   openclaw:
     requires:
@@ -30,6 +30,12 @@ This standard Agent Skill works with Codex, Claude Code, Qoder, OpenClaw, Hermes
 - **Retrieve an existing result or inspect account/tasks:** Follow the CLI workflow directly; do not rewrite a prompt or create a new task.
 
 Only ask for information that prevents a usable result, such as missing required dialogue or mutually exclusive constraints. For voice references, website controls, model limits or long scripts, consult [references/capabilities.md](references/capabilities.md). Clearer prompts improve expression of intent; optimal sound, exact duration and voice identity still need actual listening evidence.
+
+## Act as a sound director
+
+For creative work, turn the listening goal into audible choices: stable voice identity, line-specific intention, emphasis and pauses, turn taking, foreground/background hierarchy, distance and room character, event entrances and exits, emotional development and segment continuity. Read [references/direction.md](references/direction.md) for explicit directing requests, complex scenes or long programs, then load only the relevant speech or sound-design branch. Make useful choices within the requested scope; a pure voice or single-effect request keeps that scope. Optimization preserves the user's exact dialogue, lyrics, language, references and constraints.
+
+Each directed segment needs its own necessary sound instructions. Automatic CLI splitting preserves text but does not copy opening directions into later parts or perform mixing. Keep all instructions and reference prefixes within the shared input budget. Separate model guidance from precise editing targets, and verify performance by listening when available. Never treat a successful task as proof of audible quality.
 
 ## Website-aligned audio types
 
@@ -93,16 +99,16 @@ Choose the mode that fits the requested result:
 
 Background music and vocal songs both use `free` with their complete respective descriptions; there is no CLI `music`, `bgm` or `song` mode. Mode selection labels the task and does not add sound directions. For prompt preparation, use [references/prompt-writing.md](references/prompt-writing.md); read [references/speech.md](references/speech.md) for spoken content and [references/sound-design.md](references/sound-design.md) for effects, ambience, background music, songs or listening-based repairs. Preserve the user's words and chosen language. Templates and optimization are editable suggestions; submit the final authored prompt.
 
-For reference audio, run `node scripts/foleyix.mjs voices --json` and use the user's chosen saved voice IDs. Bind up to three distinct references with repeated `--voice-id ID` options, in `@voice1`–`@voice3` order. Preserve the user's existing speaker mapping; never guess IDs, substitute voices or imply that typing a marker alone attaches audio. References must belong to the connected account, have a completed preview, and be at most 30 seconds and 10 MB each. The server checks retention and counts the reference description prefix toward the 3,000-character prompt limit. Read [references/cli.md](references/cli.md) for an example. Create and preview references with `voice-create` and `voice-preview`, or upload an authorized WAV with `voice-upload`. These writes require the separately displayed `voices:write` grant; older connections must run `login` again and wait for user approval. Catalog import, audio controls, prompt optimizer, free script generator, project editing, and whole-episode exports use the website.
+For reference audio, run `node scripts/foleyix.mjs voices --json` and use the user's chosen saved voice IDs. Bind up to three distinct references with repeated `--voice-id ID` options, in `@voice1`–`@voice3` order. Preserve the user's existing speaker mapping; never guess IDs, substitute voices or imply that typing a marker alone attaches audio. References must belong to the connected account, have a completed preview, and be at most 30 seconds and 10 MB each. The server checks retention and counts the reference description prefix toward both the 500-Han-character and 2,000-total-character prompt limits. Read [references/cli.md](references/cli.md) for an example. Create and preview references with `voice-create` and `voice-preview`, or upload an authorized WAV with `voice-upload`. These writes require the separately displayed `voices:write` grant; older connections must run `login` again and wait for user approval. Catalog import, audio controls, prompt optimizer, free script generator, project editing, and whole-episode exports use the website.
 
 ```sh
 node scripts/foleyix.mjs quota --json
 node scripts/foleyix.mjs generate --mode narration --prompt "Welcome aboard. Read warmly and clearly." --out ./welcome.wav --json
 ```
 
-Use `--input /absolute/path/script.txt` instead of `--prompt` for UTF-8 files. Input is limited to 3,000 Unicode characters. Mode selection labels the task; it does not rewrite or add instructions to the submitted prompt. The default remains `narration` for existing commands; explicitly choose `--mode free` for complete descriptions and copied inspiration prompts. Generation waits up to ten minutes and downloads when `--out` is supplied; `--no-wait` returns the task ID immediately. Check the result's status and absolute file path before calling it complete. If audio inspection or playback is available in the host, listen to the delivered file and compare it with the user's request.
+Use `--input /absolute/path/script.txt` instead of `--prompt` for UTF-8 files. Each generation request is limited to 500 Han characters and 2,000 total Unicode code points including reference descriptions. Longer input is automatically split losslessly into ordered requests. Mode selection labels the task; it does not rewrite or add instructions to the submitted prompt. The default remains `narration` for existing commands; explicitly choose `--mode free` for complete descriptions and copied inspiration prompts. Generation waits up to ten minutes and downloads when `--out` is supplied; `--no-wait` returns the task ID immediately. Check the result's status and absolute file path before calling it complete. If audio inspection or playback is available in the host, listen to the delivered file and compare it with the user's request.
 
-Check quota before generating: available generation seconds are `generationLimit - generationUsed - generationReserved`. Queued tasks hold reservations; a wait timeout does not release them. Storage and queue capacity are shared with the website. Requested duration is guidance, not a guarantee; report the actual delivered duration when available. Downloading an existing result does not consume generation seconds.
+Check quota before generating: available generation seconds are `generationLimit - generationUsed - generationReserved` and must be positive to start a new task. Generation does not pre-reserve estimated time; only successful audio publication charges actual saved duration, rounded up to whole seconds. A result can take the balance negative; that debt blocks new generation and generated-audio playback/downloads until a subscription or time pack restores a nonnegative balance. A wait timeout leaves the existing task unresolved, not safe to replace. Storage and queue capacity are shared with the website. Requested duration is guidance, not a guarantee; report the actual delivered duration when available. Downloading an existing result does not consume generation seconds.
 
 Every generation request has a persistent request ID. If a response is lost, the CLI retries with the same ID and reuses unresolved matching requests on the next invocation. Preserve the returned `requestId` and use `--request-id ID` with exactly the same input when resuming. Never automatically create a replacement for a task whose status is `unknown`. A wait timeout leaves the task running; use its existing ID:
 
@@ -110,6 +116,14 @@ Every generation request has a persistent request ID. If a response is lost, the
 node scripts/foleyix.mjs status TASK_ID --json
 node scripts/foleyix.mjs download TASK_ID --out ./result.wav --json
 ```
+
+## Long video, podcast and narration audio
+
+For a long video, create its requested audio using approximately 500 Han characters or 2,000 characters for English and other languages per segment. Mixed text must satisfy both the 500-Han and 2,000-total limits. Preserve all original words, speaker labels, reference mappings, language and sound directions; do not shorten, summarize or add dialogue. Prefer sentence or paragraph boundaries near the applicable limit; hard-split an oversized sentence without losing characters. Reference descriptions reduce both budgets so the full compiled request stays within both limits.
+
+Pass the complete UTF-8 script with `generate --input /absolute/path/script.txt`. The CLI automatically splits input that exceeds the per-request budget and submits each part in order. With `--out /absolute/path/narration.wav`, separate results are saved as `narration.part-001.wav`, `narration.part-002.wav`, and so on; it does not merge clips or create a video. Return the ordered files and actual task statuses. Keep common sound directions short and preserve the user's chosen speakers across parts. For creative programs requiring controlled per-segment performance, first prepare self-contained inputs using [references/direction.md](references/direction.md); automatic splitting does not propagate the initial directions.
+
+The result contains a parent `requestId` and per-segment request/task IDs. Resume partial work with the exact original input, voice selection and parent `--request-id`; completed parts are reused. Stop on an unknown result, failure, insufficient balance/storage or a wait timeout. Never create replacement requests automatically. Use the default waiting behavior for long scripts; `--no-wait` is constrained by account queue capacity and may submit only part of a batch.
 
 ## Account and task operations
 

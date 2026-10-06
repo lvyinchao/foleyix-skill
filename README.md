@@ -1,6 +1,6 @@
 # Audio Creator · Foleyix
 
-Write, optimize and repair prompts for background music, vocal songs, podcasts, ambience, effects, game effects, narration, dialogue, sound scenes and character voices. When generation is requested, use your Foleyix account and download the finished WAV. This repository contains the portable Agent Skills package and its dependency-free Node CLI.
+Direct sound, write, optimize and repair prompts for background music, vocal songs, podcasts, ambience, effects, game effects, narration, dialogue, sound scenes and character voices. When generation is requested, use your Foleyix account and download the finished WAV. This repository contains the portable Agent Skills package and its dependency-free Node CLI.
 
 Supported installation targets include Codex, Claude Code, Qoder, OpenClaw and Hermes. Prompt-only work runs offline without login or Node.js. Account operations and generation require Node **22.20 or later**. The skill and CLI are MIT-0; audio generation uses your Foleyix account and the same duration allowance as the website. Downloading existing audio does not consume generation time.
 
@@ -32,7 +32,15 @@ Background music is instrumental; songs include singing or rap and exact lyrics.
 node scripts/foleyix.mjs capabilities --json
 ```
 
-This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. CLI 1.5.0 can create synthetic references, generate previews, upload authorized WAVs, and list and bind saved references. Catalog import, game batches and programme editing/export use the website.
+This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. CLI 1.6.0 can create synthetic references, generate previews, upload authorized WAVs, and list and bind saved references. Catalog import, game batches and programme editing/export use the website.
+
+## Sound direction and long scripts
+
+The [director guide](skills/audiocreator-foleyix/references/direction.md) plans line-specific performance, emphasis, pauses, turn taking, sound hierarchy, spatial perspective, energy changes and segment continuity while preserving exact dialogue, lyrics and user constraints. Load only the sound-type branch needed. Exact loudness, looping and seamless joins require actual editing and listening.
+
+Long input is split near sentence or paragraph boundaries into requests satisfying both limits, including bound reference descriptions. With an output path, results are separate `.part-001.wav` files. Resume with the original input and parent request ID; completed parts are reused. Stop on unknown or failed outcomes rather than creating replacement tasks. Automatic splitting does not repeat opening directions or merge/mix clips. For directed programs, prepare self-contained segment inputs with stable speaker/reference mappings.
+
+Generation charges only successfully saved audio duration. A positive balance is required to start; debt blocks generation and generated-audio access until repaid by subscription or time packs.
 
 ## Connect your account
 
@@ -56,7 +64,7 @@ node scripts/foleyix.mjs generate --mode narration \
   --out ./narration.wav
 ```
 
-Modes: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. The default remains `narration`; modes label tasks without rewriting prompts. Prompts are limited to 3,000 Unicode characters. Use `--input script.txt` for a UTF-8 text file. The CLI waits for the job and validates the WAV before saving it. `--json` provides structured results without exposing access or refresh credentials.
+Modes: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. The default remains `narration`; modes label tasks without rewriting prompts. Each complete request is limited to 500 Han characters and 2,000 total Unicode code points; mixed text obeys both limits. Longer input automatically splits losslessly into ordered requests. Use `--input script.txt` for a UTF-8 text file. The CLI waits for the job and validates the WAV before saving it. `--json` provides structured results without exposing access or refresh credentials.
 
 Keep the job ID if generation times out or its result is unknown. Follow that job with `status`, then use `download`; do not automatically create another generation to retry the same request. Use the same `--request-id` when resuming a request whose initial response was lost.
 
@@ -81,7 +89,7 @@ node scripts/foleyix.mjs voices --json
 node scripts/foleyix.mjs generate --mode dialogue --prompt '@voice1: Hello. @voice2: Welcome back.' --voice-id SAVED_FIRST_ID --voice-id SAVED_SECOND_ID --out ./dialogue.wav --json
 ```
 
-Replace the IDs with your chosen saved references from `voices`. Repeat `--voice-id` up to three times; order maps to `@voice1`, `@voice2`, `@voice3`. Typing a marker alone attaches no audio. References must be distinct, owned, completed and retained, at most 30 seconds and 10 MB each. The service uses the same reference validation and model binding as the website. The compiled prompt including reference descriptions must fit within 3,000 Unicode characters. Resume with the same reference IDs in the same order and the same request ID.
+Replace the IDs with your chosen saved references from `voices`. Repeat `--voice-id` up to three times; order maps to `@voice1`, `@voice2`, `@voice3`. Typing a marker alone attaches no audio. References must be distinct, owned, completed and retained, at most 30 seconds and 10 MB each. The service uses the same reference validation and model binding as the website. The compiled prompt including reference descriptions must fit within 500 Han characters and 2,000 total Unicode code points. Resume with the same reference IDs in the same order and the same request ID.
 
 ## Service and license
 

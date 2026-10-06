@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const skillName = 'audiocreator-foleyix';
 const source = path.join(repository, 'skills', skillName);
-const files = ['LICENSE', 'SKILL.md', 'agents/openai.yaml', 'references/audio-capabilities.json', 'references/capabilities.md', 'references/cli.md', 'references/examples.md', 'references/prompt-writing.md', 'references/sound-design.md', 'references/speech.md', 'scripts/foleyix.mjs'];
+const files = ['LICENSE', 'SKILL.md', 'agents/openai.yaml', 'references/audio-capabilities.json', 'references/capabilities.md', 'references/cli.md', 'references/direction.md', 'references/examples.md', 'references/prompt-writing.md', 'references/sound-design.md', 'references/speech.md', 'scripts/foleyix.mjs'];
 const args = process.argv.slice(2);
 let output = path.join(repository, 'public', 'downloads'), publicReleased = false, qoder = false;
 for (let i = 0; i < args.length; i++) {

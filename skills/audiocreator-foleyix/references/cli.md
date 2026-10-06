@@ -16,7 +16,7 @@ All commands accept `--origin https://foleyix.com`. A custom deployment must use
 
 ## Generation and request recovery
 
-`generate` requires exactly one of `--prompt TEXT` and `--input UTF8_FILE`. Seven modes are available: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. The default remains `narration`; explicitly choose `free` for complete authored scenes. Modes label the task and do not change its prompt. The CLI rejects input above 3,000 Unicode code points before requesting login or saving a request; UTF-8 files also have a 64 KiB byte limit. The service enforces current account entitlement. Generation spends audio time in seconds, with queue and quota reservations shared with the website.
+`generate` requires exactly one of `--prompt TEXT` and `--input UTF8_FILE`. Seven modes are available: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. The default remains `narration`; explicitly choose `free` for complete authored scenes. Modes label the task and do not change its prompt. The CLI automatically splits input above 500 Han characters or 2,000 total Unicode code points into ordered requests. Mixed text satisfies both limits. UTF-8 files also have a 64 KiB byte limit. The service enforces current account entitlement. Queue capacity and audio balance are shared with the website. Generation charges successful saved audio seconds, without pre-reserving estimated time; a negative balance blocks generation and generated-audio access until repaid.
 
 The CLI writes a request ID and input hash before contacting the service; prompt content is not stored in its journal. Network retries use the same `Idempotency-Key`. Concurrent matching unresolved requests use the same ID. To resume a known request explicitly:
 
@@ -51,7 +51,7 @@ node scripts/foleyix.mjs generate --mode dialogue --prompt '林（@voice1）轻�
 
 Replace the example IDs with actual IDs from `voices`. Repeat `--voice-id` up to three times: first maps to `@voice1`, second to `@voice2`, third to `@voice3`. IDs must be distinct. Typing a marker without its reference option attaches no audio. The CLI sends the prompt and ordered IDs separately; the service adds the same reference description prefix as the website and sends the matching audio in that order.
 
-Each reference must be owned by this account, completed, retained, at most 30 seconds and 10,000,000 bytes. The server rechecks these conditions before quota reservation and validates the real WAV before the model call. The final compiled prompt, including reference descriptions, must stay within 3,000 Unicode code points; leave room for the prefix. Failed checks return explicit errors and do not substitute a different voice. References guide identity; matching sound still requires listening.
+Each reference must be owned by this account, completed, retained, at most 30 seconds and 10,000,000 bytes. The server rechecks these conditions before task admission and validates the real WAV before the model call. The final compiled prompt, including reference descriptions, must stay within 500 Han characters and 2,000 total Unicode code points; leave room for the prefix. Failed checks return explicit errors and do not substitute a different voice. References guide identity; matching sound still requires listening.
 
 Generation waits 600 seconds by default; `--timeout SECONDS` allows 1–3600 seconds. A wait timeout is a successful query outcome with `status: queued|running`, `timedOut: true`, `requestId`, and `jobId`. It does not mean the audio succeeded. Use `status JOB_ID` and `download JOB_ID` afterward. `--no-wait` returns immediately and cannot be combined with `--out`.
 
@@ -69,7 +69,7 @@ Generation waits 600 seconds by default; `--timeout SECONDS` allows 1–3600 sec
 - Generation: `{ "ok": true, "requestId": "...", "jobId": "...", "status": "...", "timedOut": false, "job": {...} }`; a download also includes `path`, `bytes`, `mime`.
 - Failure: `{ "ok": false, "error": { "code": "...", "message": "..." } }` with exit code 1. A generation error includes the saved request ID, and a terminal task error includes its task ID.
 
-Use `error.code`, not English message text, for recovery. `not_logged_in`/`login_required` require website login; `queue_full` requires waiting; insufficient quota requires account action; `result_unavailable` may indicate expiration; `generation_unknown` requires checking the existing task. Credentials are intentionally absent from every JSON response.
+Use `error.code`, not English message text, for recovery. `not_logged_in`/`login_required` require website login; `queue_full` requires waiting; insufficient quota requires account action; `result_unavailable` may indicate expiration; `generation_unknown` requires checking the existing task. `storage_quota_exceeded` returns HTTP 429 with the exact storage reason and byte counts when available. Free storage or increase the storage allowance before submitting a new request; do not retry automatically. A storage failure is different from a temporary request-rate limit. Credentials are intentionally absent from every JSON response.
 
 ## Quota and website features
 
