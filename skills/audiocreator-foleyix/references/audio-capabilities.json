@@ -4,12 +4,11 @@
   "creationModes": ["free", "narration", "dialogue", "podcast", "scene", "sfx", "ambience"],
   "limits": {
     "promptCodePoints": 2000,
-    "promptHanCharacters": 500,
     "referenceSeconds": 30,
     "referenceBytes": 10000000,
     "references": 3,
     "validatedOutputSeconds": 240,
-    "voiceDesignPromptCodePoints": 1000
+    "voiceDesignPromptCodePoints": 2000
   },
   "types": [
     { "id": "podcast", "name": "Podcast", "nameZh": "播客", "websitePath": "/podcast-generator", "standalone": true, "websiteMode": "podcast", "cliMode": "podcast", "guide": "speech.md", "input": "Complete host-labelled spoken script and delivery directions; music only when requested." },

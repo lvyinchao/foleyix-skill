@@ -32,7 +32,7 @@ Background music is instrumental; songs include singing or rap and exact lyrics.
 node scripts/foleyix.mjs capabilities --json
 ```
 
-This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. CLI 1.6.0 can create synthetic references, generate previews, upload authorized WAVs, and list and bind saved references. Catalog import, game batches and programme editing/export use the website.
+This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. CLI 1.7.0 can create synthetic references, generate previews, upload authorized WAVs, and list and bind saved references. Catalog import, game batches and programme editing/export use the website.
 
 ## Sound direction and long scripts
 
@@ -64,7 +64,7 @@ node scripts/foleyix.mjs generate --mode narration \
   --out ./narration.wav
 ```
 
-Modes: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. The default remains `narration`; modes label tasks without rewriting prompts. Each complete request is limited to 500 Han characters and 2,000 total Unicode code points; mixed text obeys both limits. Longer input automatically splits losslessly into ordered requests. Use `--input script.txt` for a UTF-8 text file. The CLI waits for the job and validates the WAV before saving it. `--json` provides structured results without exposing access or refresh credentials.
+Modes: `free`, `narration`, `dialogue`, `podcast`, `scene`, `sfx`, `ambience`. The default remains `narration`; modes label tasks without rewriting prompts. Each complete request is limited to 2,000 Unicode code points for every language, including Chinese and mixed text. Longer input automatically splits losslessly into ordered requests. Use `--input script.txt` for a UTF-8 text file. The CLI waits for the job and validates the WAV before saving it. `--json` provides structured results without exposing access or refresh credentials.
 
 Keep the job ID if generation times out or its result is unknown. Follow that job with `status`, then use `download`; do not automatically create another generation to retry the same request. Use the same `--request-id` when resuming a request whose initial response was lost.
 
@@ -89,7 +89,7 @@ node scripts/foleyix.mjs voices --json
 node scripts/foleyix.mjs generate --mode dialogue --prompt '@voice1: Hello. @voice2: Welcome back.' --voice-id SAVED_FIRST_ID --voice-id SAVED_SECOND_ID --out ./dialogue.wav --json
 ```
 
-Replace the IDs with your chosen saved references from `voices`. Repeat `--voice-id` up to three times; order maps to `@voice1`, `@voice2`, `@voice3`. Typing a marker alone attaches no audio. References must be distinct, owned, completed and retained, at most 30 seconds and 10 MB each. The service uses the same reference validation and model binding as the website. The compiled prompt including reference descriptions must fit within 500 Han characters and 2,000 total Unicode code points. Resume with the same reference IDs in the same order and the same request ID.
+Replace the IDs with your chosen saved references from `voices`. Repeat `--voice-id` up to three times; order maps to `@voice1`, `@voice2`, `@voice3`. Typing a marker alone attaches no audio. References must be distinct, owned, completed and retained, at most 30 seconds and 10 MB each. The service uses the same reference validation and model binding as the website. The compiled prompt including reference descriptions must fit within 2,000 Unicode code points. Resume with the same reference IDs in the same order and the same request ID.
 
 ## Service and license
 

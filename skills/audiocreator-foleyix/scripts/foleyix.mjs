@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-/** Foleyix 1.6.0 — zero-dependency CLI; Node.js 22.20 or newer. */
+/** Foleyix 1.7.0 — zero-dependency CLI; Node.js 22.20 or newer. */
 import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 
-const VERSION = '1.6.0';
+const VERSION = '1.7.0';
 const CLIENT_ID = 'foleyix-cli';
 const DEFAULT_ORIGIN = 'https://foleyix.com';
 const MODES = ['free', 'narration', 'dialogue', 'podcast', 'scene', 'sfx', 'ambience'];
@@ -16,7 +16,6 @@ const MAX_AUDIO_BYTES = 128 * 1024 * 1024;
 const MAX_REFERENCE_VOICES = 3;
 const secrets = new Set();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const hanCount = value => Array.from(value.matchAll(/\p{Script=Han}/gu)).length;
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const noFollow = fsConstants.O_NOFOLLOW || 0;
 let jsonOutput = process.argv.includes('--json');
@@ -156,7 +155,7 @@ function serverError(status, data) {
     reference_rights_required: 'Confirm you are authorized to use this reference audio with --rights-confirmed.',
     reference_audio_too_long: 'Each reference must be at most 30 seconds.', reference_audio_too_large: 'Each reference must be at most 10 MB.',
     invalid_reference_audio: 'A reference has invalid audio metadata. Check or replace it on the website.',
-    invalid_prompt: 'The final prompt, including reference descriptions, must be nonempty and fit within 500 Han characters and 2,000 total Unicode code points (voice previews: 1,000).',
+    invalid_prompt: 'The final prompt, including reference descriptions, must be nonempty and fit within 2,000 total Unicode code points (voice previews: 2,000).',
   };
   const storageMessage = code === 'storage_quota_exceeded' && typeof (data?.error?.message || data?.error) === 'string' ? String(data.error.message || data.error).slice(0, 500) : null;
   return new CliError(code, storageMessage || messages[code] || (status === 401 ? 'Website login is required. Run login again.' : 'Foleyix rejected this request.'), { status, ...(code === 'storage_quota_exceeded' ? { retryable: false } : {}), ...(typeof data?.job?.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(data.job.id) ? { jobId: data.job.id } : {}) });
@@ -396,7 +395,6 @@ async function generate(options, previewVoiceId) {
   // Check login before creating an unresolved journal entry.
   await accessToken();
   let budget = 2000;
-  let hanBudget = 500;
   if (!previewVoiceId && voiceIds.length) {
     const value = await authenticated('/api/voices');
     if (!Array.isArray(value.voices)) fail('invalid_response', 'The reference voice list is incomplete.');
@@ -407,15 +405,14 @@ async function generate(options, previewVoiceId) {
     });
     const prefix = `Voice references: ${voices.map((v, i) => `@voice${i + 1} is ${v.name}: ${v.description}`).join('; ')}.\n\n`;
     budget -= Array.from(prefix).length;
-    hanBudget -= hanCount(prefix);
-    if (budget < 1 || hanBudget < 0) fail('invalid_input', 'Shorten the reference descriptions to leave room within 500 Han characters and 2,000 total characters.');
+    if (budget < 1) fail('invalid_input', 'Shorten the reference descriptions to leave room within 2,000 total characters.');
   }
-  if (previewVoiceId || Array.from(prompt).length <= budget && hanCount(prompt) <= hanBudget) return output(await generateOne(prompt, mode, voiceIds, options, previewVoiceId, timeout));
-  const chunks = splitLongPrompt(prompt, budget, hanBudget);
+  if (previewVoiceId || Array.from(prompt).length <= budget) return output(await generateOne(prompt, mode, voiceIds, options, previewVoiceId, timeout));
+  const chunks = splitLongPrompt(prompt, budget);
   if (chunks.some(chunk => !chunk.trim())) fail('invalid_input', 'An oversized whitespace-only block cannot form a valid audio segment. Shorten that block before submitting.');
-  const parent = await requestRecord(prompt, `segmented-v1:${mode}:${budget}:${hanBudget}`, options['request-id'], voiceIds);
+  const parent = await requestRecord(prompt, `segmented-v2:${mode}:${budget}`, options['request-id'], voiceIds);
   const segments = [];
-  note(`Automatically split the script into ${chunks.length} segments of at most ${hanBudget} Han characters and ${budget} total characters.`);
+  note(`Automatically split the script into ${chunks.length} segments of at most ${budget} total characters.`);
   for (const [index, chunk] of chunks.entries()) {
     const requestId = `segment-${hash(`${parent.requestId}:${index + 1}`)}`;
     const partOptions = { ...options, 'request-id': requestId, resumeDelivery: true };
@@ -437,17 +434,11 @@ async function generate(options, previewVoiceId) {
   return output({ ok: true, segmented: true, requestId: parent.requestId, totalSegments: chunks.length, submittedSegments: segments.length, status: complete ? 'succeeded' : 'pending', timedOut: segments.some(s => s.timedOut), segments });
 }
 /** Lossless Unicode splitting, preferring boundaries near the per-request cap. */
-function splitLongPrompt(prompt, budget, hanBudget) {
+function splitLongPrompt(prompt, budget) {
   const points = Array.from(prompt), chunks = [];
   let offset = 0;
   while (offset < points.length) {
-    let end = offset, han = 0;
-    while (end < points.length && end - offset < budget) {
-      const next = hanCount(points[end]);
-      if (han + next > hanBudget) break;
-      han += next; end++;
-    }
-    if (end === offset) fail('invalid_input', 'The reference descriptions leave no room for Han characters. Shorten them before splitting.');
+    let end = Math.min(points.length, offset + budget);
     if (end < points.length) {
       const candidate = points.slice(offset, end).join('');
       for (const pattern of [/\n\s*\n/gu, /[。！？.!?][”’"'）)]*\s*/gu, /\s+/gu]) {
@@ -658,7 +649,7 @@ const HELP = [
   'Global: --json, --origin https://foleyix.com',
   'Login always displays the authorization URL; --no-browser is retained for compatibility.',
   'Generation waits up to 600 seconds by default. A timeout retains the task and request IDs.',
-  'Input: at most 500 Han characters and 2,000 total Unicode characters per request including reference descriptions; longer scripts automatically split into ordered requests. Default mode: narration.',
+  'Input: at most 2,000 total Unicode characters per request including reference descriptions; longer scripts automatically split into ordered requests. Default mode: narration.',
   'Reference IDs come from voices; their order maps to @voice1, @voice2, @voice3. Typing a marker alone does not attach audio.',
   'Create and preview synthetic references or upload authorized WAVs with voices:write. Catalog import uses the website. Each reference: at most 30 seconds and 10 MB.',
   'Credentials stay in a private, per-origin directory; do not copy them into a project.',

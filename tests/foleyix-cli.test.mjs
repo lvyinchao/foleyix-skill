@@ -107,7 +107,7 @@ async function fixture(t, { handler } = {}) {
 test('device login waits for human approval, saves private per-origin login, and never outputs secrets', async (t) => {
   const f = await fixture(t, { handler({ request, body, send, state }) { if (request.url === '/api/cli/auth/token' && body.grant_type !== 'refresh_token' && state.polls++ === 0) { send(400, { error: 'authorization_pending' }); return true; } } });
   const result = await f.run(['login']);
-  assert.equal((await f.run(['version'])).data.version, '1.6.0');
+  assert.equal((await f.run(['version'])).data.version, '1.7.0');
   assert.equal(result.code, 0); assert.equal(result.data.user.email, 'user@example.test'); assert.equal(result.data.modelEnabled, true);
   assert.match(result.stderr, /ABCD-EFGH/); assert.match(result.stderr, /\/activate\?user_code=ABCD-EFGH/);
   const saved = JSON.parse(await fs.readFile(f.credentialPath, 'utf8'));
@@ -301,7 +301,7 @@ test('release ZIP is deterministic, has only reviewed skill files, and checksum 
   const script = path.join(repository, 'scripts/package-foleyix-skill.mjs');
   const first = await child(process.execPath, [script, '--out-dir', path.join(temporary, 'first')]); const second = await child(process.execPath, [script, '--out-dir', path.join(temporary, 'second')]); assert.equal(first.code, 0); assert.equal(second.code, 0);
   const bytes = await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill.zip')); assert.deepEqual(bytes, await fs.readFile(path.join(temporary, 'second', 'audiocreator-foleyix-skill.zip')));
-  const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill-manifest.json'), 'utf8')); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length); assert.equal(manifest.version, '1.6.0'); assert.equal(manifest.publicReleased, false); assert.equal(manifest.name, 'audiocreator-foleyix');
+  const manifest = JSON.parse(await fs.readFile(path.join(temporary, 'first', 'audiocreator-foleyix-skill-manifest.json'), 'utf8')); assert.equal(manifest.sha256, createHash('sha256').update(bytes).digest('hex')); assert.equal(manifest.bytes, bytes.length); assert.equal(manifest.version, '1.7.0'); assert.equal(manifest.publicReleased, false); assert.equal(manifest.name, 'audiocreator-foleyix');
   const names = []; let offset = 0;
   while (bytes.readUInt32LE(offset) === 0x04034b50) { const size = bytes.readUInt32LE(offset + 18), nameLength = bytes.readUInt16LE(offset + 26), extraLength = bytes.readUInt16LE(offset + 28); names.push(bytes.toString('utf8', offset + 30, offset + 30 + nameLength)); offset += 30 + nameLength + extraLength + size; }
   assert.deepEqual(names.sort(), ['audiocreator-foleyix/LICENSE', 'audiocreator-foleyix/SKILL.md', 'audiocreator-foleyix/agents/openai.yaml', 'audiocreator-foleyix/references/audio-capabilities.json', 'audiocreator-foleyix/references/capabilities.md', 'audiocreator-foleyix/references/cli.md', 'audiocreator-foleyix/references/direction.md', 'audiocreator-foleyix/references/examples.md', 'audiocreator-foleyix/references/prompt-writing.md', 'audiocreator-foleyix/references/sound-design.md', 'audiocreator-foleyix/references/speech.md', 'audiocreator-foleyix/scripts/foleyix.mjs']);
@@ -361,18 +361,18 @@ test('legacy scope denial explains re-login; uncertain metadata writes are not r
 });
 
 for(const [name,prompt,expected] of [
- ['500 Han','汉'.repeat(500),1],['501 Han','汉'.repeat(501),2],
+ ['2000 Chinese','汉'.repeat(2000),1],['2001 Chinese','汉'.repeat(2001),2],
  ['2000 English','x'.repeat(2000),1],['2001 English','x'.repeat(2001),2],
- ['2000 Arabic','ع'.repeat(2000),1],['mixed Han overflow','汉'.repeat(501)+'x'.repeat(500),2],
- ['mixed total overflow','汉'.repeat(500)+'x'.repeat(1501),2],['supplementary Han','𠀀'.repeat(501),2],
-])test(`CLI language-sensitive boundary: ${name}`,async t=>{
+ ['2000 Arabic','ع'.repeat(2000),1],['mixed within limit','汉'.repeat(501)+'x'.repeat(500),1],
+ ['mixed total overflow','汉'.repeat(500)+'x'.repeat(1501),2],['2000 supplementary Han','𠀀'.repeat(2000),1],['2001 supplementary Han','𠀀'.repeat(2001),2],['2000 emoji','🎧'.repeat(2000),1],['2001 emoji','🎧'.repeat(2001),2],
+])test(`CLI uniform Unicode boundary: ${name}`,async t=>{
  const f=await fixture(t);await f.seed();
  const r=await f.run(['generate','--prompt',prompt,'--request-id','boundary']);assert.equal(r.code,0,r.stdout);
  assert.equal(f.generationBodies.length,expected);assert.equal(f.generationBodies.map(b=>b.prompt).join(''),prompt);
- for(const b of f.generationBodies){assert.ok(Array.from(b.prompt).length<=2000);assert.ok(Array.from(b.prompt.matchAll(/\p{Script=Han}/gu)).length<=500);}
+ for(const b of f.generationBodies){assert.ok(Array.from(b.prompt).length<=2000);}
 });
 test('long input downloads ordered parts and resumes without duplicate generation or file overwrite',async t=>{
- const f=await fixture(t);await f.seed();const source='第一句话。'.repeat(240)+'English conclusion.',input=path.join(f.directory,'long.txt'),out=path.join(f.directory,'long.wav');await fs.writeFile(input,source);
+ const f=await fixture(t);await f.seed();const source='第一句话。'.repeat(600)+'English conclusion.',input=path.join(f.directory,'long.txt'),out=path.join(f.directory,'long.wav');await fs.writeFile(input,source);
  const args=['generate','--input',input,'--out',out,'--request-id','long-recovery'];
  const first=await f.run(args);assert.equal(first.code,0,first.stdout);assert.ok(first.data.totalSegments>1);assert.equal(first.data.status,'succeeded');
  assert.equal(f.generationBodies.map(b=>b.prompt).join(''),source);
@@ -381,23 +381,23 @@ test('long input downloads ordered parts and resumes without duplicate generatio
  // A changed local result is never silently accepted or replaced.
  await fs.writeFile(first.data.segments[0].path,Buffer.alloc(audio.length));const changed=await f.run(args);assert.equal(changed.data.error.code,'output_exists');assert.equal(f.state.generationCount,count);
 });
-test('long input reserves both budgets for the exact ordered reference prefix',async t=>{
+test('long input reserves the character budget for the exact ordered reference prefix',async t=>{
  const description='声'.repeat(100),voice={id:'saved',name:'A',description,status:'done'};
  const f=await fixture(t,{handler({request,send}){if(request.url==='/api/voices'){send(200,{voices:[voice]});return true;}}});await f.seed();
- const source='汉'.repeat(810),r=await f.run(['generate','--prompt',source,'--voice-id','saved']);assert.equal(r.code,0,r.stdout);
+ const source='汉'.repeat(3000),r=await f.run(['generate','--prompt',source,'--voice-id','saved']);assert.equal(r.code,0,r.stdout);
  const prefix=`Voice references: @voice1 is A: ${description}.\n\n`;
  assert.equal(f.generationBodies.map(b=>b.prompt).join(''),source);
- for(const b of f.generationBodies){assert.deepEqual(b.voiceIds,['saved']);assert.ok(Array.from(prefix+b.prompt).length<=2000);assert.ok(Array.from((prefix+b.prompt).matchAll(/\p{Script=Han}/gu)).length<=500);}
+ for(const b of f.generationBodies){assert.deepEqual(b.voiceIds,['saved']);assert.ok(Array.from(prefix+b.prompt).length<=2000);}
 });
 test('an unknown middle segment stops later requests and resumes only existing tasks',async t=>{
  let submissions=0;const f=await fixture(t,{handler({request,body,send,job}){
   if(request.url==='/api/generations'){submissions++;send(202,{job:job(`part-${submissions}`,{status:submissions===2?'unknown':'succeeded'})});return true;}
   if(request.url==='/api/jobs/part-2'){send(200,{job:job('part-2',{status:'unknown'})});return true;}
- }});await f.seed();const args=['generate','--prompt','汉'.repeat(1600),'--request-id','halt-unknown'];
+ }});await f.seed();const args=['generate','--prompt','汉'.repeat(6000),'--request-id','halt-unknown'];
  const first=await f.run(args);assert.equal(first.data.error.code,'generation_unknown');assert.equal(first.data.error.segment,2);assert.equal(first.data.error.requestId,'halt-unknown');assert.equal(first.data.error.segments.length,1);assert.equal(submissions,2);
  const second=await f.run(args);assert.equal(second.data.error.code,'generation_unknown');assert.equal(submissions,2);
 });
 test('a long-script storage 429 stops without submitting later segments or retrying',async t=>{
  let count=0;const f=await fixture(t,{handler({request,send,job}){if(request.url==='/api/generations'){count++;if(count===2)send(429,{code:'storage_quota_exceeded',error:'Storage is full.',retryable:false});else send(202,{job:job('first')});return true;}}});await f.seed();
- const r=await f.run(['generate','--prompt','汉'.repeat(1600),'--request-id','halt-storage']);assert.equal(r.data.error.code,'storage_quota_exceeded');assert.equal(r.data.error.segment,2);assert.equal(r.data.error.segments.length,1);assert.equal(count,2);
+ const r=await f.run(['generate','--prompt','汉'.repeat(6000),'--request-id','halt-storage']);assert.equal(r.data.error.code,'storage_quota_exceeded');assert.equal(r.data.error.segment,2);assert.equal(r.data.error.segments.length,1);assert.equal(count,2);
 });
