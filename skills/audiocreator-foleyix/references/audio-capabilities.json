@@ -11,6 +11,7 @@
     "voiceDesignPromptCodePoints": 2000
   },
   "types": [
+    { "id": "audio-drama", "name": "AI audio drama", "nameZh": "AI 有声剧", "websitePath": "/audio-drama-generator", "standalone": false, "websiteWorkflow": true, "websiteMode": null, "cliMode": null, "guide": "speech.md", "input": "Website editor: review story adaptation, cast each character, generate clean speech, arrange scene music and line effects, preview and export a single episode. No CLI or public API workflow." },
     { "id": "podcast", "name": "Podcast", "nameZh": "播客", "websitePath": "/podcast-generator", "standalone": true, "websiteMode": "podcast", "cliMode": "podcast", "guide": "speech.md", "input": "Complete host-labelled spoken script and delivery directions; music only when requested." },
     { "id": "ambience", "name": "Ambient sound", "nameZh": "环境音", "websitePath": "/ambient-sound-generator", "standalone": true, "websiteMode": "free", "cliMode": "ambience", "guide": "sound-design.md", "input": "A sustained sound environment, foreground/background sources, distance and changes." },
     { "id": "sound-effects", "name": "Sound effects", "nameZh": "音效", "websitePath": "/sound-effects", "standalone": true, "websiteMode": "free", "cliMode": "sfx", "guide": "sound-design.md", "input": "Sound source, action, material, texture, timing and decay." },
@@ -24,6 +25,6 @@
   ],
   "features": {
     "cli": ["prompt-writing", "audio-generation", "reference-voice-list", "reference-selection", "reference-voice-create-and-preview", "reference-upload", "quota", "task-history-and-status", "private-wav-download", "automatic-long-script-segmentation"],
-    "websiteOnly": ["saved-character-voice-catalog-import", "audio-rate-and-volume-controls", "script-generator", "audio-to-text", "media-to-sound-script", "professional-segment-arrangement-and-export", "game-sfx-batch-variants-and-zip"]
+    "websiteOnly": ["audio-drama-adaptation-casting-mixing-and-export","saved-character-voice-catalog-import", "audio-rate-and-volume-controls", "script-generator", "audio-to-text", "media-to-sound-script", "professional-segment-arrangement-and-export", "game-sfx-batch-variants-and-zip"]
   }
 }

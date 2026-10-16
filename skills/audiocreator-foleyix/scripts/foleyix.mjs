@@ -677,7 +677,7 @@ async function main() {
   if (command === 'quota') {
     const value = (await authenticated('/api/quota')).quota;
     if (!value || typeof value !== 'object') fail('invalid_response', 'The quota response is incomplete.');
-    const quota = Object.fromEntries(['plan', 'generationUnit', 'generationLimit', 'generationUsed', 'generationReserved', 'exportLimit', 'exportUsed', 'exportReserved', 'projectLimit', 'storageLimit', 'storageUsed', 'queueLimit', 'queueUsed', 'periodEnd'].filter((key) => typeof value[key] === 'string' || Number.isFinite(value[key]) || value[key] === null).map((key) => [key, value[key]]));
+    const quota = Object.fromEntries(['billingModel', 'paidFeatures', 'projectLimited', 'exportLimited', 'plan', 'generationUnit', 'generationLimit', 'generationUsed', 'generationReserved', 'exportLimit', 'exportUsed', 'exportReserved', 'projectLimit', 'storageLimit', 'storageUsed', 'queueLimit', 'queueLimited', 'queueUsed', 'periodEnd'].filter((key) => typeof value[key] === 'string' || typeof value[key] === 'boolean' || Number.isFinite(value[key]) || value[key] === null).map((key) => [key, value[key]]));
     return output({ ok: true, quota });
   }
   if (command === 'voices') {

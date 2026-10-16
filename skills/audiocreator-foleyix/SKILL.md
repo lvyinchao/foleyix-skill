@@ -4,7 +4,7 @@ description: Direct sound, write, optimize, or repair Foleyix prompts and create
 license: MIT-0
 metadata:
   author: "Foleyix"
-  version: "1.7.0"
+  version: "1.7.1"
   homepage: "https://foleyix.com/skill"
   openclaw:
     requires:
@@ -44,6 +44,7 @@ Read [references/audio-capabilities.json](references/audio-capabilities.json) wh
 <!-- audio-types:start -->
 | Audio type | CLI mode / workflow | Prompt focus |
 | --- | --- | --- |
+| AI audio drama / AI 有声剧 | Website workflow | Website editor: review story adaptation, cast each character, generate clean speech, arrange scene music and line effects, preview and export a single episode. No CLI or public API workflow. |
 | Podcast / 播客 | `podcast` | Complete host-labelled spoken script and delivery directions; music only when requested. |
 | Ambient sound / 环境音 | `ambience` | A sustained sound environment, foreground/background sources, distance and changes. |
 | Sound effects / 音效 | `sfx` | Sound source, action, material, texture, timing and decay. |
@@ -66,7 +67,7 @@ node scripts/foleyix.mjs capabilities --json
 
 ## Connect an account when needed
 
-Create audio through the user's Foleyix account at https://foleyix.com. The website and this CLI share the same account, audio-time quota, task queue, and sound library. The skill is free software; Foleyix generation uses the account's trial or subscription quota measured in seconds. Check `quota` for the current balance.
+Create audio through the user's Foleyix account at https://foleyix.com. The website and this CLI share the same account, audio-time quota, task queue, and sound library. The skill is free software; Foleyix generation uses the account's free trial or permanently valid purchased time-pack credit measured in seconds. Check `quota` for the current balance.
 
 Run the bundled, zero-dependency CLI from this skill's directory. Resolve the installed skill path before running a command; do not assume the project contains this script.
 
@@ -108,7 +109,7 @@ node scripts/foleyix.mjs generate --mode narration --prompt "Welcome aboard. Rea
 
 Use `--input /absolute/path/script.txt` instead of `--prompt` for UTF-8 files. Each generation request is limited to 2,000 total Unicode code points including reference descriptions. Longer input is automatically split losslessly into ordered requests. Mode selection labels the task; it does not rewrite or add instructions to the submitted prompt. The default remains `narration` for existing commands; explicitly choose `--mode free` for complete descriptions and copied inspiration prompts. Generation waits up to ten minutes and downloads when `--out` is supplied; `--no-wait` returns the task ID immediately. Check the result's status and absolute file path before calling it complete. If audio inspection or playback is available in the host, listen to the delivered file and compare it with the user's request.
 
-Check quota before generating: available generation seconds are `generationLimit - generationUsed - generationReserved` and must be positive to start a new task. Generation does not pre-reserve estimated time; only successful audio publication charges actual saved duration, rounded up to whole seconds. A result can take the balance negative; that debt blocks new generation and generated-audio playback/downloads until a subscription or time pack restores a nonnegative balance. A wait timeout leaves the existing task unresolved, not safe to replace. Storage and queue capacity are shared with the website. Requested duration is guidance, not a guarantee; report the actual delivered duration when available. Downloading an existing result does not consume generation seconds.
+Check quota before generating: available generation seconds are `generationLimit - generationUsed - generationReserved` and must be positive to start a new task. Generation does not pre-reserve estimated time; only successful audio publication charges actual saved duration, rounded up to whole seconds. A result can take the balance negative; that debt blocks new generation and generated-audio playback/downloads until a time pack restores a nonnegative balance. A wait timeout leaves the existing task unresolved, not safe to replace. Storage is shared with the website. There is no per-user task-count limit. All audio jobs use Cloudflare Queues; an upstream HTTP 429 pauses new requests to that upstream for at least 5 seconds before retrying the same task, for up to 30 minutes of queue waiting. Do not create replacement tasks while the original task is waiting. Requested duration is guidance, not a guarantee; report the actual delivered duration when available. Downloading an existing result does not consume generation seconds.
 
 Every generation request has a persistent request ID. If a response is lost, the CLI retries with the same ID and reuses unresolved matching requests on the next invocation. Preserve the returned `requestId` and use `--request-id ID` with exactly the same input when resuming. Never automatically create a replacement for a task whose status is `unknown`. A wait timeout leaves the task running; use its existing ID:
 
@@ -123,7 +124,7 @@ For a long video, create its requested audio using up to 2,000 Unicode code poin
 
 Pass the complete UTF-8 script with `generate --input /absolute/path/script.txt`. The CLI automatically splits input that exceeds the per-request budget and submits each part in order. With `--out /absolute/path/narration.wav`, separate results are saved as `narration.part-001.wav`, `narration.part-002.wav`, and so on; it does not merge clips or create a video. Return the ordered files and actual task statuses. Keep common sound directions short and preserve the user's chosen speakers across parts. For creative programs requiring controlled per-segment performance, first prepare self-contained inputs using [references/direction.md](references/direction.md); automatic splitting does not propagate the initial directions.
 
-The result contains a parent `requestId` and per-segment request/task IDs. Resume partial work with the exact original input, voice selection and parent `--request-id`; completed parts are reused. Stop on an unknown result, failure, insufficient balance/storage or a wait timeout. Never create replacement requests automatically. Use the default waiting behavior for long scripts; `--no-wait` is constrained by account queue capacity and may submit only part of a batch.
+The result contains a parent `requestId` and per-segment request/task IDs. Resume partial work with the exact original input, voice selection and parent `--request-id`; completed parts are reused. Stop on an unknown result, failure, insufficient balance/storage or a wait timeout. Never create replacement requests automatically. Use the default waiting behavior for long scripts; `--no-wait` can submit independent segments without waiting for earlier ones; preserve each original task ID and segment order.
 
 ## Account and task operations
 
@@ -135,4 +136,10 @@ node scripts/foleyix.mjs logout --json
 
 Downloads require an available result owned by the connected account. The CLI checks WAV type, header, and complete byte count before saving atomically. Choose an existing output directory; existing files need an explicit `--force`. Logout revokes this CLI connection and reports success only after the server confirms it.
 
-Read [references/cli.md](references/cli.md) for pagination, JSON outcomes, request recovery, and development-origin usage. A paused model service, exhausted audio time, full queue, expired result, or rejected website authorization is a concrete failure; report it without claiming audio was generated.
+Read [references/cli.md](references/cli.md) for pagination, JSON outcomes, request recovery, and development-origin usage. A paused model service, exhausted audio time, upstream queue timeout, expired result, or rejected website authorization is a concrete failure; report it without claiming audio was generated.
+
+## Time packs and file retention
+
+Foleyix uses one-time audio packs, not recurring purchases. Standard packs cost USD 9.90/29.90/79.90/199.90 for 60/240/720/2000 minutes. The double-time promotion has no preset end date; use the server-confirmed checkout quote for the actual award. Any verified purchase unlocks professional features and API access permanently while at least one purchase remains not fully refunded. At zero balance, editing and exporting still work but new generation does not. Check `paidFeatures`, `projectLimited`, `exportLimited` and `queueLimited`; historical `plan` is not purchase eligibility.
+
+New verified accounts receive 15 free minutes. Paid storage defaults to 5 GB and does not accumulate with purchases; administrator overrides can differ. Purchased time never expires, but generated/ exported files last 90 days from creation (free audio: 24 hours). Buying again does not refresh existing paid-file deadlines. Voice reference audio persists until the user deletes it and counts toward storage. Download deliverables promptly. A `429 storage_quota_exceeded` is an application-owned storage error, not upstream throttling: do not blindly retry it or recommend buying more time to expand storage.

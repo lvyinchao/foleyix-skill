@@ -32,7 +32,7 @@ Background music is instrumental; songs include singing or rap and exact lyrics.
 node scripts/foleyix.mjs capabilities --json
 ```
 
-This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. CLI 1.7.0 can create synthetic references, generate previews, upload authorized WAVs, and list and bind saved references. Catalog import, game batches and programme editing/export use the website.
+This command reads the bundled website capability snapshot without login or network access. The upstream website and skill share a source catalog; publication checks its modes, input limits and generated copies. For current online capabilities, use [the public descriptor](https://foleyix.com/audio-capabilities.json). If unavailable, prompt preparation can use the bundled snapshot. The CLI can create synthetic references, generate previews, upload authorized WAVs, and list and bind saved references. Catalog import, game batches and programme editing/export use the website.
 
 ## Sound direction and long scripts
 
@@ -40,7 +40,7 @@ The [director guide](skills/audiocreator-foleyix/references/direction.md) plans 
 
 Long input is split near sentence or paragraph boundaries into requests satisfying both limits, including bound reference descriptions. With an output path, results are separate `.part-001.wav` files. Resume with the original input and parent request ID; completed parts are reused. Stop on unknown or failed outcomes rather than creating replacement tasks. Automatic splitting does not repeat opening directions or merge/mix clips. For directed programs, prepare self-contained segment inputs with stable speaker/reference mappings.
 
-Generation charges only successfully saved audio duration. A positive balance is required to start; debt blocks generation and generated-audio access until repaid by subscription or time packs.
+Generation charges only successfully saved audio duration. A positive balance is required to start; debt blocks generation and generated-audio access until repaid by a one-time audio time pack. Purchased time never expires. Any valid purchase unlocks the professional workspace, API, unlimited projects and exports, and fixed 5 GB storage independently of the remaining balance. Buying more time does not expand storage. Paid generated files last 90 days from creation; reference audio remains until deleted. Generation queues are not limited by purchase tier.
 
 ## Connect your account
 
